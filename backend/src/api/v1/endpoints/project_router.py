@@ -31,22 +31,6 @@ async def build_project(request: BuildRequest, background_tasks: BackgroundTasks
     """
     # Get API key from request or environment
     pipeline = get_pipeline_agent()
-    api_key = request.openai_api_key or os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="OpenAI API key required. Set OPENAI_API_KEY environment variable or provide in request."
-        )
-
-    # Initialize pipeline if needed
-    if pipeline is None:
-        try:
-            pipeline = MultiAgentPipeline(api_key)
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to initialize pipeline: {str(e)}"
-            )
 
     # Run the pipeline
     try:

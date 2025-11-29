@@ -8,10 +8,6 @@ class BuildRequest(BaseModel):
         description="User prompt describing the project to build",
         example="Create a REST API for a todo list with FastAPI and SQLite"
     )
-    openai_api_key: str | None = Field(
-        None,
-        description="OpenAI API key (if not set in environment)"
-    )
 
 
 class BuildResponse(BaseModel):

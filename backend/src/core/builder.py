@@ -3,10 +3,12 @@ Code Builder Module - Generates actual project files
 Part of the Multi-Agent Software Factory Generator
 """
 
+from loguru import logger
 from typing import Dict, Any
 from langchain_openai import ChatOpenAI
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.system import SystemMessage
+
 import json
 
 
@@ -62,7 +64,9 @@ class ProjectBuilder:
         features = requirements.get('features', [])
 
         system_prompt = f"""You are an expert software developer. Generate production-ready code
-        for a {platform} application.
+        for a {platform} application. 
+        
+        You should implement functionality from scratch if needed. If code is not there, you should create everything with functional code. 
         
         Project: {project_name}
         Description: {description}
@@ -98,7 +102,8 @@ class ProjectBuilder:
         ]
 
         response = self.llm.invoke(messages)
-
+        logger.info(response)
+        print(response)
         try:
             files = json.loads(response.content)
             return files

@@ -69,8 +69,7 @@ class MultiAgentPipeline:
         """
         # Initialize LLM
         self.llm = ChatOpenAI(
-            model="gpt-4",
-            temperature=0.7,
+            model="o4-mini-2025-04-16",
             openai_api_key=openai_api_key
         )
 

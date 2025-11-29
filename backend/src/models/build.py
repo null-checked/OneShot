@@ -4,9 +4,8 @@ class BuildRequest(BaseModel):
     """Request model for /build endpoint."""
 
     prompt: str = Field(
-        ...,
         description="User prompt describing the project to build",
-        example="Create a REST API for a todo list with FastAPI and SQLite"
+        examples=["Create a REST API for a todo list with FastAPI and SQLite"]
     )
 
 

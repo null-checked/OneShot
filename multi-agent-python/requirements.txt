@@ -1,0 +1,27 @@
+# Multi-Agent Software Factory Generator
+# Python 3.10+ required
+
+# Core frameworks
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# LangChain and LangGraph
+langchain==0.1.6
+langchain-openai==0.0.5
+langchain-community==0.0.20
+langgraph==0.0.20
+langsmith==0.0.87
+
+# Deep Agents (if available, else we'll use langchain agents)
+# deep-agents==0.1.0  # Uncomment if available
+
+# HTTP client
+httpx==0.26.0
+aiofiles==23.2.1
+
+# Utilities
+python-multipart==0.0.6
+python-dotenv==1.0.0
+jinja2==3.1.3

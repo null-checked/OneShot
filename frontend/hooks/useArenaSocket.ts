@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { WSEvent, ArenaState, AgentPersonality } from '@/lib/types';
+import type { WSEvent, ArenaState, AgentPersonality, ArchitectState, AgentTask, TestFeedback } from '@/lib/types';
 
 interface UseArenaSocketOptions {
   url?: string;
@@ -20,10 +20,23 @@ interface ArenaSocketReturn {
 
 // Default agent personalities
 const DEFAULT_AGENTS: AgentPersonality[] = [
-  { name: 'RecursiveRex', color: '#3498db', approach: 'Recursive & Divide-and-Conquer' },
-  { name: 'DynamicDana', color: '#2ecc71', approach: 'Dynamic Programming' },
-  { name: 'GreedyGus', color: '#e74c3c', approach: 'Greedy Algorithms' },
+  { name: 'AlgoMaster', color: '#3498db', approach: 'Algorithm Specialist' },
+  { name: 'CodeCrafter', color: '#2ecc71', approach: 'Clean Code Expert' },
+  { name: 'SpeedDemon', color: '#e74c3c', approach: 'Performance Optimizer' },
 ];
+
+const DEFAULT_MAX_RETRIES = 5;
+
+const createInitialArchitectState = (): ArchitectState => ({
+  status: 'idle',
+});
+
+const createInitialAgentState = (personality: AgentPersonality) => ({
+  personality,
+  status: 'idle' as const,
+  retryCount: 0,
+  maxRetries: DEFAULT_MAX_RETRIES,
+});
 
 export function useArenaSocket(options: UseArenaSocketOptions = {}): ArenaSocketReturn {
   const {
@@ -36,10 +49,8 @@ export function useArenaSocket(options: UseArenaSocketOptions = {}): ArenaSocket
   const [error, setError] = useState<string | null>(null);
   const [arenaState, setArenaState] = useState<ArenaState>({
     status: 'idle',
-    agents: DEFAULT_AGENTS.map(personality => ({
-      personality,
-      status: 'idle',
-    })),
+    architect: createInitialArchitectState(),
+    agents: DEFAULT_AGENTS.map(createInitialAgentState),
   });
 
   const ws = useRef<WebSocket | null>(null);
@@ -65,13 +76,44 @@ export function useArenaSocket(options: UseArenaSocketOptions = {}): ArenaSocket
           break;
         }
 
+        case 'architect_start': {
+          setArenaState(prev => ({
+            ...prev,
+            architect: { ...prev.architect, status: 'planning' },
+          }));
+          break;
+        }
+
+        case 'architect_complete': {
+          const data = wsEvent.data as ArchitectState['plan'];
+          setArenaState(prev => ({
+            ...prev,
+            status: 'coding',
+            architect: { ...prev.architect, status: 'complete', plan: data },
+          }));
+          break;
+        }
+
+        case 'agent_task_assigned': {
+          const data = wsEvent.data as { agent: string; task: AgentTask };
+          setArenaState(prev => ({
+            ...prev,
+            agents: prev.agents.map(agent =>
+              agent.personality.name === data.agent
+                ? { ...agent, task: data.task, status: 'idle' as const }
+                : agent
+            ),
+          }));
+          break;
+        }
+
         case 'agent_start': {
           const data = wsEvent.data as { agent: string };
           setArenaState(prev => ({
             ...prev,
             agents: prev.agents.map(agent =>
               agent.personality.name === data.agent
-                ? { ...agent, status: 'thinking' as const }
+                ? { ...agent, status: 'coding' as const }
                 : agent
             ),
           }));
@@ -102,6 +144,19 @@ export function useArenaSocket(options: UseArenaSocketOptions = {}): ArenaSocket
           break;
         }
 
+        case 'test_start': {
+          const data = wsEvent.data as { agent: string };
+          setArenaState(prev => ({
+            ...prev,
+            agents: prev.agents.map(agent =>
+              agent.personality.name === data.agent
+                ? { ...agent, status: 'testing' as const }
+                : agent
+            ),
+          }));
+          break;
+        }
+
         case 'test_results': {
           const data = wsEvent.data as ArenaState['agents'][0]['testResults'];
           setArenaState(prev => ({
@@ -109,6 +164,41 @@ export function useArenaSocket(options: UseArenaSocketOptions = {}): ArenaSocket
             agents: prev.agents.map(agent =>
               agent.personality.name === data?.agent_name
                 ? { ...agent, testResults: data }
+                : agent
+            ),
+          }));
+          break;
+        }
+
+        case 'test_feedback': {
+          const data = wsEvent.data as { agent: string; feedback: TestFeedback };
+          setArenaState(prev => ({
+            ...prev,
+            agents: prev.agents.map(agent =>
+              agent.personality.name === data.agent
+                ? { 
+                    ...agent, 
+                    testFeedback: data.feedback,
+                    status: data.feedback.passed ? 'complete' as const : 'fixing' as const,
+                  }
+                : agent
+            ),
+          }));
+          break;
+        }
+
+        case 'agent_retry': {
+          const data = wsEvent.data as { agent: string; retry_count: number; max_retries: number };
+          setArenaState(prev => ({
+            ...prev,
+            agents: prev.agents.map(agent =>
+              agent.personality.name === data.agent
+                ? { 
+                    ...agent, 
+                    status: 'coding' as const,
+                    retryCount: data.retry_count,
+                    maxRetries: data.max_retries,
+                  }
                 : agent
             ),
           }));
@@ -230,10 +320,8 @@ export function useArenaSocket(options: UseArenaSocketOptions = {}): ArenaSocket
       // Reset state
       setArenaState({
         status: 'parsing',
-        agents: DEFAULT_AGENTS.slice(0, numAgents).map(personality => ({
-          personality,
-          status: 'idle',
-        })),
+        architect: createInitialArchitectState(),
+        agents: DEFAULT_AGENTS.slice(0, numAgents).map(createInitialAgentState),
       });
 
       // Send problem

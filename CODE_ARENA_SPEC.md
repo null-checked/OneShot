@@ -9,6 +9,18 @@ The system should support:
 2. **OpenAI API** as alternative
 3. **Self-hosted** via any OpenAI-compatible endpoint (vLLM, LocalAI, etc.)
 
+### User Workflow
+
+1. Get the user prompt
+2. Plan the research
+3. Research the market
+4. Plan the implementation
+5. Research the documentation
+6. Implement the code
+7. Review the code
+8. Test the code
+9. Write down the project documentation in Markdown format
+
 ---
 
 ## Tech Stack

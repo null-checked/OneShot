@@ -5,6 +5,7 @@ Replaces REST endpoints with real-time WebSocket communication.
 
 from fastapi import WebSocket, WebSocketDisconnect
 from pathlib import Path
+import concurrent.futures
 import json
 import asyncio
 from typing import Dict, Any
@@ -141,8 +142,14 @@ async def run_pipeline_with_progress(pipeline: MultiAgentPipeline, prompt: str, 
     original_step9 = pipeline._step9_write_documentation
     original_step10 = pipeline._step10_write_to_disk
 
-    async def wrapped_step(step_num: int, step_name: str, original_func, state):
-        await manager.send_progress(client_id, step_num, step_name)
+    main_loop = asyncio.get_event_loop()
+
+    def wrapped_step(step_num: int, step_name: str, original_func, state):
+        asyncio.run_coroutine_threadsafe(
+            manager.send_progress(client_id, step_num, step_name),
+            main_loop
+        ).result()
+
         return original_func(state)
 
     # Wrap each step
@@ -157,11 +164,9 @@ async def run_pipeline_with_progress(pipeline: MultiAgentPipeline, prompt: str, 
     pipeline._step9_write_documentation = lambda s: wrapped_step(9, "📖 Writing documentation...", original_step9, s)
     pipeline._step10_write_to_disk = lambda s: wrapped_step(10, "💾 Writing to disk...", original_step10, s)
 
-    # Run pipeline synchronously (we'll handle async in a thread)
-    import concurrent.futures
-    loop = asyncio.get_event_loop()
+    # Run pipeline synchronously in executor
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        final_state = await loop.run_in_executor(executor, pipeline.run, prompt)
+        final_state = await main_loop.run_in_executor(executor, pipeline.run, prompt)
 
     return final_state
 

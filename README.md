@@ -17,7 +17,7 @@ Here's how you can use the application:
    -H "Content-Type: application/json" \
    -d '{
      "problem": "Write a function named `sum_evens` that returns the sum of all even numbers in a list of integers."
-   5 }'
+   }'
 ```
   3. Run a Problem with Real-Time Updates (Advanced)
   For a better experience (as intended for the frontend), you can connect to the /ws/arena WebSocket. The server will send you events as they happen (problem parsing, agent generation,

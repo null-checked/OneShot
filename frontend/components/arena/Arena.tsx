@@ -2,9 +2,10 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Code2, Brain, TestTube, Scale, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Code2, Brain, TestTube, Scale, Sparkles, CheckCircle2, ClipboardList } from 'lucide-react';
 import type { ArenaState } from '@/lib/types';
 import { AgentCard } from './AgentCard';
+import { ArchitectCard } from './ArchitectCard';
 import { Scoreboard } from './Scoreboard';
 
 interface ArenaProps {
@@ -12,13 +13,14 @@ interface ArenaProps {
 }
 
 export function Arena({ arenaState }: ArenaProps) {
-  const { status, problem, agents, synthesis } = arenaState;
+  const { status, problem, architect, agents, synthesis } = arenaState;
 
   // Status configuration
   const statusConfig = {
     idle: { label: 'Idle', icon: null, color: 'bg-zinc-600' },
     parsing: { label: 'Parsing Problem', icon: Brain, color: 'bg-blue-500 animate-pulse' },
-    generating: { label: 'Generating Solutions', icon: Code2, color: 'bg-purple-500 animate-pulse' },
+    planning: { label: 'Architect Planning', icon: ClipboardList, color: 'bg-purple-500 animate-pulse' },
+    coding: { label: 'Agents Coding', icon: Code2, color: 'bg-indigo-500 animate-pulse' },
     testing: { label: 'Running Tests', icon: TestTube, color: 'bg-yellow-500 animate-pulse' },
     judging: { label: 'Judging Solutions', icon: Scale, color: 'bg-orange-500 animate-pulse' },
     synthesizing: { label: 'Creating Hybrid', icon: Sparkles, color: 'bg-pink-500 animate-pulse' },
@@ -45,6 +47,19 @@ export function Arena({ arenaState }: ArenaProps) {
                   {problem.test_count} test cases
                 </span>
               )}
+            </div>
+            
+            {/* Flow indicator */}
+            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+              <span className={status === 'parsing' ? 'text-blue-500 font-medium' : ''}>Parse</span>
+              <span>→</span>
+              <span className={status === 'planning' ? 'text-purple-500 font-medium' : ''}>Plan</span>
+              <span>→</span>
+              <span className={status === 'coding' ? 'text-indigo-500 font-medium' : ''}>Code</span>
+              <span>→</span>
+              <span className={status === 'testing' ? 'text-yellow-500 font-medium' : ''}>Test</span>
+              <span>→</span>
+              <span className={status === 'judging' || status === 'synthesizing' ? 'text-pink-500 font-medium' : ''}>Synthesize</span>
             </div>
           </div>
         </CardContent>
@@ -77,61 +92,68 @@ export function Arena({ arenaState }: ArenaProps) {
         </Card>
       )}
 
-      {/* Agent Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {agents.map(agent => (
-          <AgentCard
-            key={agent.personality.name}
-            agent={agent}
-          />
-        ))}
+      {/* Architect Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-1">
+          <ArchitectCard architect={architect} />
+        </div>
 
-        {/* Hybrid Solution Card (only shown when synthesis is complete) */}
-        {synthesis && (
-          <Card className="relative overflow-hidden border-2 border-purple-500 bg-gradient-to-br from-purple-500/5 to-transparent">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500" />
-            <CardContent className="py-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-500" />
-                <h3 className="font-bold text-lg">Hybrid Solution</h3>
-              </div>
-
-              <Badge className="bg-purple-500 text-white">Synthesized</Badge>
-
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="font-medium">Approach: </span>
-                  <span className="text-muted-foreground">{synthesis.approach}</span>
-                </div>
-                <div className="flex gap-2">
-                  <span>Time: {synthesis.time_complexity}</span>
-                  <span>Space: {synthesis.space_complexity}</span>
-                </div>
-              </div>
-
-              {synthesis.code && (
-                <div className="bg-zinc-900 p-3 rounded font-mono text-xs text-white max-h-64 overflow-y-auto">
-                  <pre>{synthesis.code}</pre>
-                </div>
-              )}
-
-              {synthesis.improvements && synthesis.improvements.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Key Improvements:</p>
-                  <ul className="text-xs text-muted-foreground space-y-0.5">
-                    {synthesis.improvements.slice(0, 3).map((improvement, i) => (
-                      <li key={i} className="flex items-start gap-1">
-                        <span className="text-purple-500">•</span>
-                        <span>{improvement}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {/* Agent Cards Grid */}
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+          {agents.map(agent => (
+            <AgentCard
+              key={agent.personality.name}
+              agent={agent}
+            />
+          ))}
+        </div>
       </div>
+
+      {/* Hybrid Solution Card (only shown when synthesis is complete) */}
+      {synthesis && (
+        <Card className="relative overflow-hidden border-2 border-purple-500 bg-gradient-to-br from-purple-500/5 to-transparent">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500" />
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-500" />
+              <h3 className="font-bold text-lg">Hybrid Solution</h3>
+            </div>
+
+            <Badge className="bg-purple-500 text-white">Synthesized</Badge>
+
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="font-medium">Approach: </span>
+                <span className="text-muted-foreground">{synthesis.approach}</span>
+              </div>
+              <div className="flex gap-2">
+                <span>Time: {synthesis.time_complexity}</span>
+                <span>Space: {synthesis.space_complexity}</span>
+              </div>
+            </div>
+
+            {synthesis.code && (
+              <div className="bg-zinc-900 p-3 rounded font-mono text-xs text-white max-h-64 overflow-y-auto">
+                <pre>{synthesis.code}</pre>
+              </div>
+            )}
+
+            {synthesis.improvements && synthesis.improvements.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Key Improvements:</p>
+                <ul className="text-xs text-muted-foreground space-y-0.5">
+                  {synthesis.improvements.slice(0, 3).map((improvement, i) => (
+                    <li key={i} className="flex items-start gap-1">
+                      <span className="text-purple-500">•</span>
+                      <span>{improvement}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Scoreboard */}
       {agents.some(agent => agent.score) && (

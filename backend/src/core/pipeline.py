@@ -60,18 +60,22 @@ class MultiAgentPipeline:
     9. Documentation Writer -> Write docs
     """
 
-    def __init__(self, openai_api_key: str):
+    def __init__(self, openai_api_key: str, progress_callback=None):
         """
         Initialize the pipeline with all agents.
         
         Args:
             openai_api_key: OpenAI API key for LLM access
+            progress_callback: Optional callback function(step_num, message) for progress updates
         """
         # Initialize LLM
         self.llm = ChatOpenAI(
             model="gpt-5-mini-2025-08-07",
             openai_api_key=openai_api_key
         )
+        
+        # Store progress callback
+        self.progress_callback = progress_callback
 
         # Initialize specialized modules
         self.builder = ProjectBuilder(self.llm)
@@ -139,6 +143,8 @@ class MultiAgentPipeline:
     def _step1_analyze_prompt(self, state: WorkflowState) -> WorkflowState:
         """Step 1: Analyze user prompt and extract requirements."""
         print("📝 Step 1: Analyzing user prompt...")
+        if self.progress_callback:
+            self.progress_callback(1, "📝 Analyzing user prompt...")
 
         try:
             requirements = self.prompt_analyzer.execute(state["user_prompt"])
@@ -154,6 +160,8 @@ class MultiAgentPipeline:
     def _step2_plan_research(self, state: WorkflowState) -> WorkflowState:
         """Step 2: Plan research activities."""
         print("🔍 Step 2: Planning research...")
+        if self.progress_callback:
+            self.progress_callback(2, "🔍 Planning research...")
 
         try:
             research_plan = self.research_planner.execute(
@@ -169,6 +177,8 @@ class MultiAgentPipeline:
     def _step3_market_research(self, state: WorkflowState) -> WorkflowState:
         """Step 3: Conduct market research."""
         print("📊 Step 3: Conducting market research...")
+        if self.progress_callback:
+            self.progress_callback(3, "📊 Conducting market research...")
 
         try:
             market_research = self.market_researcher.execute(
@@ -186,6 +196,8 @@ class MultiAgentPipeline:
     def _step4_plan_implementation(self, state: WorkflowState) -> WorkflowState:
         """Step 4: Plan implementation architecture."""
         print("🏗️  Step 4: Planning implementation...")
+        if self.progress_callback:
+            self.progress_callback(4, "🏗️ Planning implementation...")
 
         try:
             implementation_plan = self.implementation_planner.execute(
@@ -203,6 +215,8 @@ class MultiAgentPipeline:
     def _step5_research_documentation(self, state: WorkflowState) -> WorkflowState:
         """Step 5: Research technical documentation."""
         print("📚 Step 5: Researching documentation...")
+        if self.progress_callback:
+            self.progress_callback(5, "📚 Researching documentation...")
 
         try:
             documentation_research = self.documentation_researcher.execute(
@@ -219,6 +233,8 @@ class MultiAgentPipeline:
     def _step6_implement_code(self, state: WorkflowState) -> WorkflowState:
         """Step 6: Generate code files."""
         print("💻 Step 6: Implementing code...")
+        if self.progress_callback:
+            self.progress_callback(6, "💻 Implementing code...")
 
         try:
             code_files = self.code_implementer.execute(
@@ -237,6 +253,8 @@ class MultiAgentPipeline:
     def _step7_review_code(self, state: WorkflowState) -> WorkflowState:
         """Step 7: Review generated code."""
         print("🔎 Step 7: Reviewing code...")
+        if self.progress_callback:
+            self.progress_callback(7, "🔎 Reviewing code...")
 
         try:
             review_results = self.code_reviewer.execute(
@@ -255,6 +273,8 @@ class MultiAgentPipeline:
     def _step8_test_code(self, state: WorkflowState) -> WorkflowState:
         """Step 8: Generate and run tests."""
         print("🧪 Step 8: Testing code...")
+        if self.progress_callback:
+            self.progress_callback(8, "🧪 Testing code...")
 
         try:
             test_results = self.code_tester.execute(
@@ -277,6 +297,8 @@ class MultiAgentPipeline:
     def _step9_write_documentation(self, state: WorkflowState) -> WorkflowState:
         """Step 9: Generate documentation."""
         print("📖 Step 9: Writing documentation...")
+        if self.progress_callback:
+            self.progress_callback(9, "📖 Writing documentation...")
 
         try:
             documentation_files = self.documentation_writer.execute(
@@ -296,6 +318,8 @@ class MultiAgentPipeline:
     def _step10_write_to_disk(self, state: WorkflowState) -> WorkflowState:
         """Step 10: Write all files to disk."""
         print("💾 Step 10: Writing files to disk...")
+        if self.progress_callback:
+            self.progress_callback(10, "💾 Writing files to disk...")
 
         try:
             project_name = state["requirements"].get(

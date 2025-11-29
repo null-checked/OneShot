@@ -10,7 +10,7 @@ import asyncio
 from typing import Dict, Any
 
 from src.core.pipeline import MultiAgentPipeline
-from src.settings import get_pipeline_agent, fs_writer
+from src.settings import get_pipeline_agent, fs_writer, settings
 from src.api.v1.helpers import create_project_zip
 
 
@@ -128,41 +128,33 @@ async def handle_build_project(websocket: WebSocket, client_id: str, data: dict)
 async def run_pipeline_with_progress(pipeline: MultiAgentPipeline, prompt: str, client_id: str) -> Dict[str, Any]:
     """
     Run the pipeline and send progress updates via WebSocket.
+    Uses the pipeline's built-in progress callback.
     """
-    # Hook into pipeline steps to send progress
-    original_step1 = pipeline._step1_analyze_prompt
-    original_step2 = pipeline._step2_plan_research
-    original_step3 = pipeline._step3_market_research
-    original_step4 = pipeline._step4_plan_implementation
-    original_step5 = pipeline._step5_research_documentation
-    original_step6 = pipeline._step6_implement_code
-    original_step7 = pipeline._step7_review_code
-    original_step8 = pipeline._step8_test_code
-    original_step9 = pipeline._step9_write_documentation
-    original_step10 = pipeline._step10_write_to_disk
-
-    async def wrapped_step(step_num: int, step_name: str, original_func, state):
-        await manager.send_progress(client_id, step_num, step_name)
-        return original_func(state)
-
-    # Wrap each step
-    pipeline._step1_analyze_prompt = lambda s: wrapped_step(1, "📝 Analyzing prompt...", original_step1, s)
-    pipeline._step2_plan_research = lambda s: wrapped_step(2, "🔍 Planning research...", original_step2, s)
-    pipeline._step3_market_research = lambda s: wrapped_step(3, "📊 Conducting market research...", original_step3, s)
-    pipeline._step4_plan_implementation = lambda s: wrapped_step(4, "🏗️ Planning implementation...", original_step4, s)
-    pipeline._step5_research_documentation = lambda s: wrapped_step(5, "📚 Researching documentation...", original_step5, s)
-    pipeline._step6_implement_code = lambda s: wrapped_step(6, "💻 Implementing code...", original_step6, s)
-    pipeline._step7_review_code = lambda s: wrapped_step(7, "🔎 Reviewing code...", original_step7, s)
-    pipeline._step8_test_code = lambda s: wrapped_step(8, "🧪 Testing code...", original_step8, s)
-    pipeline._step9_write_documentation = lambda s: wrapped_step(9, "📖 Writing documentation...", original_step9, s)
-    pipeline._step10_write_to_disk = lambda s: wrapped_step(10, "💾 Writing to disk...", original_step10, s)
-
-    # Run pipeline synchronously (we'll handle async in a thread)
-    import concurrent.futures
-    loop = asyncio.get_event_loop()
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        final_state = await loop.run_in_executor(executor, pipeline.run, prompt)
-
+    
+    # Get the main event loop before starting the executor
+    main_loop = asyncio.get_running_loop()
+    
+    # Create a sync callback that works from any thread
+    def progress_callback(step_num: int, message: str):
+        """Callback that sends progress updates to the WebSocket client."""
+        try:
+            # Schedule the coroutine to run in the main event loop
+            asyncio.run_coroutine_threadsafe(
+                manager.send_progress(client_id, step_num, message),
+                main_loop
+            )
+        except Exception as e:
+            print(f"Error sending progress update: {e}")
+    
+    # Create a new pipeline instance with the progress callback
+    pipeline_with_progress = MultiAgentPipeline(
+        openai_api_key=settings.OPENAI_API_KEY,
+        progress_callback=progress_callback
+    )
+    
+    # Run pipeline in executor to avoid blocking
+    final_state = await main_loop.run_in_executor(None, pipeline_with_progress.run, prompt)
+    
     return final_state
 
 

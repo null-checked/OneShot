@@ -21,7 +21,7 @@ export default function Home() {
     isConnected,
     error: socketError,
   } = useArenaSocket({
-    url: 'ws://localhost:8000/ws/arena',
+    url: 'http://localhost:8000/projects/build',
     autoReconnect: true,
   });
 

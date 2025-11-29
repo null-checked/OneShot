@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test Client</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #444;
+        }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 100px;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #output {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 8px 0;
+            padding: 8px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .log-connected {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .log-progress {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        .log-complete {
+            background: #e8f5e9;
+            color: #2e7d32;
+            font-weight: 600;
+        }
+        .log-error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .status-disconnected {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .status-connected {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Multi-Agent Software Factory</h1>
+        <p class="subtitle">
+            WebSocket Test Client
+            <span id="status" class="status status-disconnected">Disconnected</span>
+        </p>
+
+        <div class="input-group">
+            <label for="wsUrl">WebSocket URL:</label>
+            <input type="text" id="wsUrl" value="ws://localhost:8000/ws" 
+                   style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 4px;">
+        </div>
+
+        <div class="input-group">
+            <label for="prompt">Project Description:</label>
+            <textarea id="prompt" placeholder="Example: Create a REST API for a todo list using FastAPI and SQLite with CRUD operations">Create a REST API for a todo list using FastAPI and SQLite with CRUD operations</textarea>
+        </div>
+
+        <button id="connectBtn" onclick="connect()">Connect & Build</button>
+        <button id="listBtn" onclick="listProjects()" disabled>List Projects</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const listBtn = document.getElementById('listBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = message;
+            output.appendChild(entry);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function setConnected(connected) {
+            if (connected) {
+                status.textContent = 'Connected';
+                status.className = 'status status-connected';
+                connectBtn.disabled = true;
+                listBtn.disabled = false;
+                disconnectBtn.disabled = false;
+            } else {
+                status.textContent = 'Disconnected';
+                status.className = 'status status-disconnected';
+                connectBtn.disabled = false;
+                listBtn.disabled = true;
+                disconnectBtn.disabled = true;
+            }
+        }
+
+        function connect() {
+            const wsUrl = document.getElementById('wsUrl').value;
+            const prompt = document.getElementById('prompt').value;
+
+            if (!prompt.trim()) {
+                alert('Please enter a project description');
+                return;
+            }
+
+            output.innerHTML = '';
+            log('Connecting to ' + wsUrl + '...', 'info');
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                log('✓ Connected to server', 'connected');
+                setConnected(true);
+            };
+
+            ws.onmessage = (event) => {
+                const response = JSON.parse(event.data);
+
+                if (response.type === 'connected') {
+                    log('Server: ' + response.message, 'connected');
+                    // Send build request
+                    ws.send(JSON.stringify({
+                        action: 'build',
+                        data: { prompt: prompt }
+                    }));
+                    log('→ Sent build request', 'info');
+                }
+                else if (response.type === 'progress') {
+                    log(`[Step ${response.step}/10] ${response.message}`, 'progress');
+                }
+                else if (response.type === 'complete') {
+                    const data = response.data;
+                    log('✅ Project generation complete!', 'complete');
+                    log(`Project: ${data.project_name}`, 'complete');
+                    log(`Files: ${data.files_count}`, 'complete');
+                    log(`Path: ${data.project_path}`, 'complete');
+                    log(`Download: ${data.download_url}`, 'complete');
+                    if (data.review_score) {
+                        log(`Review Score: ${data.review_score}`, 'complete');
+                    }
+                    if (data.tests_passed) {
+                        log(`Tests Passed: ${data.tests_passed}`, 'complete');
+                    }
+                }
+                else if (response.type === 'error') {
+                    log('❌ Error: ' + response.error, 'error');
+                }
+            };
+
+            ws.onerror = (error) => {
+                log('WebSocket error occurred', 'error');
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                log('Connection closed', 'info');
+                setConnected(false);
+                ws = null;
+            };
+        }
+
+        function listProjects() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected');
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                action: 'list',
+                data: {}
+            }));
+            log('→ Requesting project list...', 'info');
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+    </script>
+</body>
+</html>

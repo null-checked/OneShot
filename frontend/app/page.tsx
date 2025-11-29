@@ -180,7 +180,7 @@ export default function Home() {
                   <li>Three AI agents with different approaches generate solutions</li>
                   <li>Each solution is tested and evaluated</li>
                   <li>A judge ranks them based on correctness, performance, and quality</li>
-                  <li>A synthesizer creates a hybrid "best-of" solution</li>
+                  <li>A synthesizer creates a hybrid &quot;best-of&quot; solution</li>
                 </ol>
               </CardContent>
             </Card>

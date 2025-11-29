@@ -44,7 +44,7 @@ export function Scoreboard({ agents, synthesis }: ScoreboardProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {rankedAgents.map((agent, index) => {
+          {rankedAgents.map((agent) => {
             const score = agent.score!;
             const isWinner = score.rank === 1;
 

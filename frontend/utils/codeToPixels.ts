@@ -167,20 +167,19 @@ export function codeToPixels(code: string, maxWidth: number = 60): Pixel[][] {
           currentRow = [];
         }
 
-        if (lines[i].length > 0) {
-          for (const char of lines[i]) {
-            currentRow.push({
-              color: TOKEN_COLORS[token.type as keyof typeof TOKEN_COLORS] || TOKEN_COLORS.identifier,
-              type: token.type
-            });
-          }
+        // Add a pixel for each character in the line
+        for (let j = 0; j < lines[i].length; j++) {
+          currentRow.push({
+            color: TOKEN_COLORS[token.type as keyof typeof TOKEN_COLORS] || TOKEN_COLORS.identifier,
+            type: token.type
+          });
         }
       }
       continue;
     }
 
     // Add token characters to current row
-    for (const char of token.value) {
+    for (let i = 0; i < token.value.length; i++) {
       currentRow.push({
         color: TOKEN_COLORS[token.type as keyof typeof TOKEN_COLORS] || TOKEN_COLORS.identifier,
         type: token.type

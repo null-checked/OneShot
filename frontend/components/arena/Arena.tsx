@@ -83,7 +83,6 @@ export function Arena({ arenaState }: ArenaProps) {
           <AgentCard
             key={agent.personality.name}
             agent={agent}
-            totalTests={problem?.test_count}
           />
         ))}
 

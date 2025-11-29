@@ -45,6 +45,7 @@ export function useArenaSocket(options: UseArenaSocketOptions = {}): ArenaSocket
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
   const shouldReconnect = useRef(false);
+  const connectRef = useRef<(() => void) | null>(null);
 
   // Handle incoming WebSocket messages
   const handleMessage = useCallback((event: MessageEvent) => {
@@ -186,7 +187,7 @@ export function useArenaSocket(options: UseArenaSocketOptions = {}): ArenaSocket
         if (shouldReconnect.current && autoReconnect) {
           reconnectTimeout.current = setTimeout(() => {
             console.log('Attempting to reconnect...');
-            connect();
+            connectRef.current?.();
           }, reconnectInterval);
         }
       };
@@ -195,6 +196,11 @@ export function useArenaSocket(options: UseArenaSocketOptions = {}): ArenaSocket
       setError('Failed to connect');
     }
   }, [url, autoReconnect, reconnectInterval, handleMessage]);
+
+  // Keep connectRef updated with the latest connect function
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   // Disconnect from WebSocket
   const disconnect = useCallback(() => {

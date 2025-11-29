@@ -10,10 +10,9 @@ import { TestRunner } from './TestRunner';
 
 interface AgentCardProps {
   agent: AgentState;
-  totalTests?: number;
 }
 
-export function AgentCard({ agent, totalTests = 0 }: AgentCardProps) {
+export function AgentCard({ agent }: AgentCardProps) {
   const { personality, status, solution, testResults, score } = agent;
 
   // Status badge configuration

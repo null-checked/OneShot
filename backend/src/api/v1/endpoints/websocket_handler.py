@@ -5,6 +5,7 @@ Replaces REST endpoints with real-time WebSocket communication.
 
 from fastapi import WebSocket, WebSocketDisconnect
 from pathlib import Path
+import concurrent.futures
 import json
 import asyncio
 from typing import Dict, Any

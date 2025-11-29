@@ -67,28 +67,44 @@ async def run_arena_ws(websocket: WebSocket):
     Runs the full arena workflow with real-time updates over a WebSocket connection.
     """
     await websocket.accept()
+    loop = asyncio.get_running_loop()
     
     try:
         initial_data = await websocket.receive_text()
         request = ArenaRequest.model_validate_json(initial_data)
 
-        async def event_callback(event_type: str, data: Any):
-            """Async callback to send events over the WebSocket."""
-            await websocket.send_json({"type": event_type, "data": data})
+        def sync_event_callback(event_type: str, data: Any):
+            """
+            A synchronous callback that sends data to the async WebSocket by scheduling
+            it on the main event loop.
+            """
+            future = asyncio.run_coroutine_threadsafe(
+                websocket.send_json({"type": event_type, "data": data}),
+                loop
+            )
+            try:
+                future.result(timeout=5.0)
+            except Exception as e:
+                print(f"Error sending event to websocket: {e}")
 
-        orchestrator = ArenaOrchestrator(settings, event_callback)
+        orchestrator = ArenaOrchestrator(settings, sync_event_callback)
         
-        loop = asyncio.get_event_loop()
-        # Run the synchronous 'run' method in a thread pool executor
+        # Run the synchronous orchestrator in a thread to avoid blocking the event loop
         await loop.run_in_executor(None, orchestrator.run, request.problem)
         
     except WebSocketDisconnect:
         print("Client disconnected from WebSocket.")
     except Exception as e:
-        # Send a final error message before closing
-        await websocket.send_json({"type": "error", "data": {"message": f"An unexpected error occurred: {e}"}})
+        error_message = f"An unexpected error occurred: {e}"
+        print(error_message)
+        try:
+            # Send a final error message before closing
+            await websocket.send_json({"type": "error", "data": {"message": error_message}})
+        except Exception:
+            pass # Ignore errors on sending if connection is already closed
     finally:
-        if websocket.client_state != 2: # STATE.DISCONNECTED
+        # Check if the websocket is still connected before trying to close
+        if websocket.client_state.name != 'DISCONNECTED':
              await websocket.close()
 
 

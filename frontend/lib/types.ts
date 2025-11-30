@@ -3,6 +3,31 @@ export interface WSEvent {
     data: any;
 }
 
+export interface BuildProgress {
+    step: number;
+    message: string;
+    data?: any;
+}
+
+export interface SubstepUpdate {
+    step: number;
+    substep: string;
+    message: string;
+    data?: {
+        file?: string;
+        snippet?: string;
+        files?: string[];
+        snippets?: Record<string, string>;
+        project_path?: string;
+        [key: string]: any;
+    };
+}
+
+export interface HeartbeatUpdate {
+    current_step: number;
+    last_substep: string;
+}
+
 export interface AgentPersonality {
     name: string;
     color: string;

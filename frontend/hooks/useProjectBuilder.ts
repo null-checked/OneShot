@@ -6,6 +6,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export interface BuildProgress {
     step: number;
     message: string;
+    data?: any;
+}
+
+export interface SubstepUpdate {
+    step: number;
+    substep: string;
+    message: string;
+    data?: {
+        file?: string;
+        snippet?: string;
+        files?: string[];
+        snippets?: Record<string, string>;
+        project_path?: string;
+        [key: string]: any;
+    };
+}
+
+export interface HeartbeatUpdate {
+    current_step: number;
+    last_substep: string;
 }
 
 export interface ProjectResult {
@@ -35,11 +55,14 @@ export interface ProjectDetails extends Project {
 }
 
 interface WSMessage {
-    type: "connected" | "progress" | "complete" | "error";
+    type: "connected" | "progress" | "substep" | "heartbeat" | "complete" | "error";
     message?: string;
     step?: number;
+    substep?: string;
     data?: any;
     error?: string;
+    current_step?: number;
+    last_substep?: string;
 }
 
 interface UseProjectBuilderOptions {
@@ -57,6 +80,8 @@ interface ProjectBuilderReturn {
     isConnected: boolean;
     isBuilding: boolean;
     progress: BuildProgress | null;
+    substeps: SubstepUpdate[];
+    heartbeat: HeartbeatUpdate | null;
     result: ProjectResult | null;
     projects: Project[];
     projectDetails: ProjectDetails | null;
@@ -69,6 +94,8 @@ export function useProjectBuilder(options: UseProjectBuilderOptions = {}): Proje
     const [isConnected, setIsConnected] = useState(false);
     const [isBuilding, setIsBuilding] = useState(false);
     const [progress, setProgress] = useState<BuildProgress | null>(null);
+    const [substeps, setSubsteps] = useState<SubstepUpdate[]>([]);
+    const [heartbeat, setHeartbeat] = useState<HeartbeatUpdate | null>(null);
     const [result, setResult] = useState<ProjectResult | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(null);
@@ -96,6 +123,28 @@ export function useProjectBuilder(options: UseProjectBuilderOptions = {}): Proje
                         setProgress({
                             step: message.step,
                             message: message.message,
+                            data: message.data,
+                        });
+                    }
+                    break;
+
+                case "substep":
+                    if (message.step && message.substep && message.message) {
+                        const substepUpdate: SubstepUpdate = {
+                            step: message.step,
+                            substep: message.substep,
+                            message: message.message,
+                            data: message.data,
+                        };
+                        setSubsteps((prev) => [...prev, substepUpdate]);
+                    }
+                    break;
+
+                case "heartbeat":
+                    if (message.current_step !== undefined && message.last_substep) {
+                        setHeartbeat({
+                            current_step: message.current_step,
+                            last_substep: message.last_substep,
                         });
                     }
                     break;
@@ -209,6 +258,8 @@ export function useProjectBuilder(options: UseProjectBuilderOptions = {}): Proje
         try {
             setIsBuilding(true);
             setProgress(null);
+            setSubsteps([]);
+            setHeartbeat(null);
             setResult(null);
             setError(null);
 
@@ -290,6 +341,8 @@ export function useProjectBuilder(options: UseProjectBuilderOptions = {}): Proje
         isConnected,
         isBuilding,
         progress,
+        substeps,
+        heartbeat,
         result,
         projects,
         projectDetails,

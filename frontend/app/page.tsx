@@ -6,8 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Code2, Play, RotateCcw, Wifi, WifiOff, Download, FileCode, CheckCircle2 } from "lucide-react";
+import { Code2, Play, RotateCcw, Wifi, WifiOff, Download, FileCode, CheckCircle2, Activity } from "lucide-react";
 import { useProjectBuilder } from "@/hooks/useProjectBuilder";
+import { SubstepsViewer } from "@/components/arena/SubstepsViewer";
 
 export default function Home() {
     const [promptInput, setPromptInput] = useState("");
@@ -21,6 +22,8 @@ export default function Home() {
         isConnected,
         isBuilding,
         progress,
+        substeps,
+        heartbeat,
         result,
         projects,
         projectDetails,
@@ -154,9 +157,18 @@ export default function Home() {
                                     <Badge variant="secondary">Step {progress.step}/10</Badge>
                                 </div>
                                 <Progress value={(progress.step / 10) * 100} className="h-2" />
+                                {heartbeat && (
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
+                                        <Activity className="w-3 h-3 animate-pulse" />
+                                        <span className="truncate">{heartbeat.last_substep}</span>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     )}
+
+                    {/* Substeps Display */}
+                    {substeps.length > 0 && <SubstepsViewer substeps={substeps} currentStep={progress?.step} />}
 
                     {/* Result Display */}
                     {result && (

@@ -4,12 +4,15 @@ Part of the Multi-Agent Software Factory Generator
 """
 
 from typing import Dict, Any, List, Optional
+from deepagents import create_deep_agent
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.system import SystemMessage
 
 import json
+
+from src.core.tools.search_tool import internet_search
 
 
 # ============================================================================
@@ -32,7 +35,8 @@ class PromptAnalyzerAgent:
     - Target platform (web, mobile, desktop, CLI)
     - Any specific requirements or constraints
     
-    Output valid JSON with these fields:
+    Output ONLY valid JSON with these fields:
+    ```json
     {
         "project_name": "...",
         "description": "...",
@@ -41,22 +45,30 @@ class PromptAnalyzerAgent:
         "platform": "...",
         "constraints": ["...", "..."]
     }
+    ```
     """
 
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
+        self.name = "PromptAnalyzerAgent"
 
     def execute(self, user_prompt: str) -> Dict[str, Any]:
         """Analyze the user prompt and extract requirements."""
-        messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
-            HumanMessage(content=f"User prompt: {user_prompt}")
-        ]
-
-        response = self.llm.invoke(messages)
-
+        deep_agent = create_deep_agent(self.llm, tools=[internet_search], system_prompt=self.SYSTEM_PROMPT, name=self.name, debug=True)
+        print(f"Analyzing prompt with {self.name}. User prompt: {user_prompt}")
+        response = deep_agent.invoke(
+            {
+                "messages" : [
+                    {
+                        "role": "user",
+                        "content": user_prompt
+                    }
+                ]
+            }
+        )
+        
         try:
-            result = json.loads(response.content)
+            result = json.loads(response) if isinstance(response, str) else response
         except json.JSONDecodeError:
             # Fallback if LLM doesn't return valid JSON
             result = {
@@ -69,7 +81,6 @@ class PromptAnalyzerAgent:
             }
 
         return result
-
 
 # ============================================================================
 # AGENT 2: Research Planner Agent
@@ -84,39 +95,65 @@ class ResearchPlannerAgent:
     SYSTEM_PROMPT = """You are a research planner. Based on project requirements,
     create a research plan to gather necessary information.
     
-    Output JSON with:
+    Output ONLY valid JSON, wrapped in triple backticks, with:
+    ```json
     {
         "market_research_topics": ["...", "..."],
         "competitor_analysis": ["...", "..."],
         "documentation_needed": ["...", "..."],
         "best_practices": ["...", "..."]
     }
+    ```
     """
 
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
+        self.name = "ResearchPlannerAgent"
 
     def execute(self, requirements: Dict[str, Any]) -> Dict[str, Any]:
         """Plan research based on requirements."""
-        messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
-            HumanMessage(
-                content=f"Project requirements: {json.dumps(requirements, indent=2)}")
-        ]
-
-        response = self.llm.invoke(messages)
-
+        deep_agent = create_deep_agent(self.llm, tools=[internet_search], system_prompt=self.SYSTEM_PROMPT, name=self.name, debug=True)
+        print(f"Planning research with {self.name}.")
+        # Ensure requirements is JSON-serializable
+        serializable_requirements = self._ensure_json_serializable(requirements)
+        
+        user_prompt_content = f"Project requirements: {json.dumps(serializable_requirements, indent=2)}"
+        
+        response = deep_agent.invoke(
+            {
+                "messages" : [
+                    { 
+                        "role": "user",
+                        "content": user_prompt_content
+                    }
+                ]
+            }
+        )
+        
         try:
-            result = json.loads(response.content)
+            result = json.loads(response) if isinstance(response, str) else response
         except json.JSONDecodeError:
+            # Fallback if LLM doesn't return valid JSON
             result = {
                 "market_research_topics": ["Industry best practices", "Similar solutions"],
                 "competitor_analysis": [],
                 "documentation_needed": requirements.get("tech_stack", []),
                 "best_practices": []
             }
-
         return result
+    def _ensure_json_serializable(self, obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {k: self._ensure_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._ensure_json_serializable(elem) for elem in obj]
+        elif hasattr(obj, 'content'): # Handle LangChain message objects
+            return obj.content
+        else:
+            try:
+                json.dumps(obj)
+                return obj
+            except TypeError:
+                return str(obj) # Fallback to string representation for other non-serializable types
 
 
 # ============================================================================
@@ -132,30 +169,45 @@ class MarketResearcherAgent:
     SYSTEM_PROMPT = """You are a market researcher. Based on the research plan,
     provide insights about existing solutions, market trends, and best practices.
     
-    Output JSON with:
+    Output ONLY valid JSON, wrapped in triple backticks, with:
+    ```json
     {
         "market_insights": ["...", "..."],
         "existing_solutions": [{"name": "...", "features": ["...", "..."]}],
         "trends": ["...", "..."],
         "recommendations": ["...", "..."]
     }
+    ```
     """
 
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
+        self.name = "MarketResearcherAgent"
 
     def execute(self, research_plan: Dict[str, Any], requirements: Dict[str, Any]) -> Dict[str, Any]:
         """Conduct market research."""
-        messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
-            HumanMessage(content=f"Research plan: {json.dumps(research_plan, indent=2)}\n\n"
-                         f"Requirements: {json.dumps(requirements, indent=2)}")
-        ]
-
-        response = self.llm.invoke(messages)
-
+        deep_agent = create_deep_agent(self.llm, tools=[internet_search], system_prompt=self.SYSTEM_PROMPT, name=self.name, debug=True)
+        print(f"Conducting market research with {self.name}.")
+        # Ensure inputs are JSON-serializable
+        serializable_research_plan = self._ensure_json_serializable(research_plan)
+        serializable_requirements = self._ensure_json_serializable(requirements)
+        
+        user_prompt_content = f"Research plan: {json.dumps(serializable_research_plan, indent=2)}\n\n" \
+                              f"Requirements: {json.dumps(serializable_requirements, indent=2)}"
+        
+        response = deep_agent.invoke(
+            {
+                "messages" : [
+                    { 
+                        "role": "user",
+                        "content": user_prompt_content
+                    }
+                ]
+            }
+        )
+        
         try:
-            result = json.loads(response.content)
+            result = json.loads(response) if isinstance(response, str) else response
         except json.JSONDecodeError:
             result = {
                 "market_insights": ["Standard practices apply"],
@@ -163,8 +215,20 @@ class MarketResearcherAgent:
                 "trends": [],
                 "recommendations": ["Follow industry standards"]
             }
-
         return result
+    def _ensure_json_serializable(self, obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {k: self._ensure_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._ensure_json_serializable(elem) for elem in obj]
+        elif hasattr(obj, 'content'): # Handle LangChain message objects
+            return obj.content
+        else:
+            try:
+                json.dumps(obj)
+                return obj
+            except TypeError:
+                return str(obj) # Fallback to string representation for other non-serializable types
 
 
 # ============================================================================
@@ -180,7 +244,8 @@ class ImplementationPlannerAgent:
     SYSTEM_PROMPT = """You are a software architect. Create a detailed implementation plan
     including file structure, modules, and architecture.
     
-    Output JSON with:
+    Output ONLY valid JSON, wrapped in triple backticks, with:
+    ```json
     {
         "architecture": "description of architecture pattern",
         "file_structure": {
@@ -197,23 +262,35 @@ class ImplementationPlannerAgent:
         ],
         "tech_stack_final": ["...", "..."]
     }
+    ```
     """
 
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
+        self.name = "ImplementationPlannerAgent"
 
     def execute(self, requirements: Dict[str, Any], research: Dict[str, Any]) -> Dict[str, Any]:
         """Create implementation plan."""
-        messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
-            HumanMessage(content=f"Requirements: {json.dumps(requirements, indent=2)}\n\n"
-                         f"Research: {json.dumps(research, indent=2)}")
-        ]
-
-        response = self.llm.invoke(messages)
-
+        deep_agent = create_deep_agent(self.llm, tools=[internet_search], system_prompt=self.SYSTEM_PROMPT, name=self.name,debug=True)
+        print(f"Generating implementation plan with {self.name}.")
+        # Ensure inputs are JSON-serializable
+        serializable_requirements = self._ensure_json_serializable(requirements)
+        serializable_research = self._ensure_json_serializable(research)
+        
+        user_prompt_content = f"Requirements: {json.dumps(serializable_requirements, indent=2)}\n\nResearch: {json.dumps(serializable_research, indent=2)}"
+        
+        response = deep_agent.invoke(
+            {
+                "messages" : [
+                    { 
+                        "role": "user",
+                        "content": user_prompt_content
+                    }
+                ]
+            }
+        )
         try:
-            result = json.loads(response.content)
+            result = json.loads(response) if isinstance(response, str) else response
         except json.JSONDecodeError:
             result = {
                 "architecture": "Modular architecture",
@@ -221,8 +298,21 @@ class ImplementationPlannerAgent:
                 "modules": [],
                 "tech_stack_final": requirements.get("tech_stack", [])
             }
-
         return result
+
+    def _ensure_json_serializable(self, obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {k: self._ensure_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._ensure_json_serializable(elem) for elem in obj]
+        elif hasattr(obj, 'content'): # Handle LangChain message objects
+            return obj.content
+        else:
+            try:
+                json.dumps(obj)
+                return obj
+            except TypeError:
+                return str(obj) # Fallback to string representation for other non-serializable types
 
 
 # ============================================================================
@@ -238,7 +328,8 @@ class DocumentationResearcherAgent:
     SYSTEM_PROMPT = """You are a documentation researcher. Provide relevant documentation
     excerpts, code examples, and API references for the tech stack.
     
-    Output JSON with:
+    Output ONLY valid JSON, wrapped in triple backticks, with:
+    ```json
     {
         "documentation": {
             "framework_name": {
@@ -248,23 +339,35 @@ class DocumentationResearcherAgent:
             }
         }
     }
+    ```
     """
 
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
+        self.name = "DocumentationResearcherAgent"
 
     def execute(self, implementation_plan: Dict[str, Any]) -> Dict[str, Any]:
         """Research documentation."""
-        messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
-            HumanMessage(
-                content=f"Tech stack: {json.dumps(implementation_plan.get('tech_stack_final', []))}")
-        ]
-
-        response = self.llm.invoke(messages)
+        deep_agent = create_deep_agent(self.llm, tools=[internet_search], system_prompt=self.SYSTEM_PROMPT, name=self.name, debug=True)
+        print(f"Researching documentation with {self.name}.")
+        # Ensure inputs are JSON-serializable
+        serializable_implementation_plan = self._ensure_json_serializable(implementation_plan)
+        
+        user_prompt_content = f"Tech stack: {json.dumps(serializable_implementation_plan.get('tech_stack_final', []), indent=2)}"
+        
+        response = deep_agent.invoke(
+            {
+                "messages" : [
+                    { 
+                        "role": "user",
+                        "content": user_prompt_content
+                    }
+                ]
+            }
+        )
 
         try:
-            result = json.loads(response.content)
+            result = json.loads(response) if isinstance(response, str) else response
         except json.JSONDecodeError:
             result = {"documentation": {}}
 

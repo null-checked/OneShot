@@ -5,7 +5,7 @@ from pathlib import Path
 
 from src.core.pipeline import MultiAgentPipeline
 from src.models.build import BuildRequest, BuildResponse
-from src.settings import get_pipeline_agent, fs_writer
+from src.core.pipeline_utils import get_pipeline_agent
 from src.api.v1.helpers import create_project_zip
 
 router = APIRouter(prefix="/projects", tags=["Projects"])

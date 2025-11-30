@@ -7,7 +7,8 @@ from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.system import SystemMessage
-import json
+from deepagents import create_deep_agent
+from src.core.tools.search_tool import internet_search
 
 
 class CodeTester:
@@ -18,6 +19,7 @@ class CodeTester:
 
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
+        self.name = "CodeTester"
 
     def generate_and_test(self, files: Dict[str, str], requirements: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -64,29 +66,54 @@ class CodeTester:
 
         # Prepare code for test generation
         code_summary = self._prepare_code_for_testing(files)
+        
+        # Ensure requirements is JSON-serializable
+        serializable_requirements = self._ensure_json_serializable(requirements)
 
         user_prompt = f"""Generate pytest test files for this code:
 
 {code_summary}
 
-Project: {requirements.get('project_name', 'Unknown')}
-Features to test: {', '.join(requirements.get('features', []))}
+Project: {serializable_requirements.get('project_name', 'Unknown')}
+Features to test: {', '.join(serializable_requirements.get('features', []))}
 """
-
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
-        ]
-
-        response = self.llm.invoke(messages)
+        deep_agent = create_deep_agent(self.llm, tools=[internet_search], system_prompt="", name=self.name,debug=True) # System prompt passed in messages
+        response = deep_agent.invoke(
+            {
+                "messages" : [
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    },
+                    { 
+                        "role": "user",
+                        "content": user_prompt
+                    }
+                ]
+            }
+        )
 
         try:
-            test_files = json.loads(response.content)
+            test_files = json.loads(response) if isinstance(response, str) else response
         except json.JSONDecodeError:
             # Fallback: generate basic test file
             test_files = self._generate_fallback_tests(requirements)
 
         return test_files
+
+    def _ensure_json_serializable(self, obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {k: self._ensure_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._ensure_json_serializable(elem) for elem in obj]
+        elif hasattr(obj, 'content'): # Handle LangChain message objects
+            return obj.content
+        else:
+            try:
+                json.dumps(obj)
+                return obj
+            except TypeError:
+                return str(obj) # Fallback to string representation for other non-serializable types
 
     def _prepare_code_for_testing(self, files: Dict[str, str]) -> str:
         """Prepare code summary for test generation."""

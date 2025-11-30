@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings
 
-from src.core.pipeline import MultiAgentPipeline
 from src.core.filesystem_writer import FilesystemWriter
 
 class Settings(BaseSettings):
@@ -17,12 +16,12 @@ class Settings(BaseSettings):
     
     OPENAI_API_KEY: str
 
+    TAVILY_API_KEY: str
+
     class Config:
         env_file = ".env"
 
 
 settings = Settings()
 
-def get_pipeline_agent():
-    return MultiAgentPipeline(settings.OPENAI_API_KEY)
 fs_writer = FilesystemWriter()

@@ -8,8 +8,10 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 import os
 
+from pydantic import SecretStr
+
 # Import all agent modules
-from src.core.agents import (
+from src.core.agents.agents import (
     PromptAnalyzerAgent,
     ResearchPlannerAgent,
     MarketResearcherAgent,
@@ -21,9 +23,9 @@ from src.core.agents import (
     DocumentationWriterAgent
 )
 from src.core.builder import ProjectBuilder
-from src.core.reviewer import CodeReviewer
-from src.core.tester import CodeTester
-from src.core.doc_writer import DocumentationWriter
+from src.core.agents.reviewer import CodeReviewer
+from src.core.agents.tester import CodeTester
+from src.core.agents.doc_writer import DocumentationWriter
 from src.core.filesystem_writer import FilesystemWriter
 
 
@@ -70,8 +72,8 @@ class MultiAgentPipeline:
         """
         # Initialize LLM
         self.llm = ChatOpenAI(
-            model="gpt-5-mini-2025-08-07",
-            openai_api_key=openai_api_key
+            model="gpt-4o-mini",
+            api_key=SecretStr(openai_api_key)
         )
         
         # Store progress callback
@@ -98,7 +100,7 @@ class MultiAgentPipeline:
         # Build the graph
         self.graph = self._build_graph()
 
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self):
         """Build the LangGraph workflow."""
 
         # Create graph

@@ -69,7 +69,7 @@ class MultiAgentPipeline:
         """
         # Initialize LLM
         self.llm = ChatOpenAI(
-            model="gpt-5-mini-2025-08-07",
+            model="gpt-4o-mini",
             openai_api_key=openai_api_key
         )
 
@@ -138,37 +138,37 @@ class MultiAgentPipeline:
 
     def _step1_analyze_prompt(self, state: WorkflowState) -> WorkflowState:
         """Step 1: Analyze user prompt and extract requirements."""
-        print("📝 Step 1: Analyzing user prompt...")
+        print("[NOTE] Step 1: Analyzing user prompt...")
 
         try:
             requirements = self.prompt_analyzer.execute(state["user_prompt"])
             state["requirements"] = requirements
             print(
-                f"✓ Requirements extracted for: {requirements.get('project_name', 'Unknown')}")
+                f"[OK] Requirements extracted for: {requirements.get('project_name', 'Unknown')}")
         except Exception as e:
             state["error"] = f"Step 1 error: {str(e)}"
-            print(f"✗ Error in step 1: {e}")
+            print(f"[ERR] Error in step 1: {e}")
 
         return state
 
     def _step2_plan_research(self, state: WorkflowState) -> WorkflowState:
         """Step 2: Plan research activities."""
-        print("🔍 Step 2: Planning research...")
+        print("[SEARCH] Step 2: Planning research...")
 
         try:
             research_plan = self.research_planner.execute(
                 state["requirements"])
             state["research_plan"] = research_plan
-            print("✓ Research plan created")
+            print("[OK] Research plan created")
         except Exception as e:
             state["error"] = f"Step 2 error: {str(e)}"
-            print(f"✗ Error in step 2: {e}")
+            print(f"[ERR] Error in step 2: {e}")
 
         return state
 
     def _step3_market_research(self, state: WorkflowState) -> WorkflowState:
         """Step 3: Conduct market research."""
-        print("📊 Step 3: Conducting market research...")
+        print("[DATA] Step 3: Conducting market research...")
 
         try:
             market_research = self.market_researcher.execute(
@@ -176,16 +176,16 @@ class MultiAgentPipeline:
                 state["requirements"]
             )
             state["market_research"] = market_research
-            print("✓ Market research completed")
+            print("[OK] Market research completed")
         except Exception as e:
             state["error"] = f"Step 3 error: {str(e)}"
-            print(f"✗ Error in step 3: {e}")
+            print(f"[ERR] Error in step 3: {e}")
 
         return state
 
     def _step4_plan_implementation(self, state: WorkflowState) -> WorkflowState:
         """Step 4: Plan implementation architecture."""
-        print("🏗️  Step 4: Planning implementation...")
+        print("[ARCH]  Step 4: Planning implementation...")
 
         try:
             implementation_plan = self.implementation_planner.execute(
@@ -193,32 +193,32 @@ class MultiAgentPipeline:
                 state["market_research"]
             )
             state["implementation_plan"] = implementation_plan
-            print("✓ Implementation plan created")
+            print("[OK] Implementation plan created")
         except Exception as e:
             state["error"] = f"Step 4 error: {str(e)}"
-            print(f"✗ Error in step 4: {e}")
+            print(f"[ERR] Error in step 4: {e}")
 
         return state
 
     def _step5_research_documentation(self, state: WorkflowState) -> WorkflowState:
         """Step 5: Research technical documentation."""
-        print("📚 Step 5: Researching documentation...")
+        print("[DOCS] Step 5: Researching documentation...")
 
         try:
             documentation_research = self.documentation_researcher.execute(
                 state["implementation_plan"]
             )
             state["documentation_research"] = documentation_research
-            print("✓ Documentation research completed")
+            print("[OK] Documentation research completed")
         except Exception as e:
             state["error"] = f"Step 5 error: {str(e)}"
-            print(f"✗ Error in step 5: {e}")
+            print(f"[ERR] Error in step 5: {e}")
 
         return state
 
     def _step6_implement_code(self, state: WorkflowState) -> WorkflowState:
         """Step 6: Generate code files."""
-        print("💻 Step 6: Implementing code...")
+        print("[CODE] Step 6: Implementing code...")
 
         try:
             code_files = self.code_implementer.execute(
@@ -227,16 +227,16 @@ class MultiAgentPipeline:
                 state["documentation_research"]
             )
             state["code_files"] = code_files
-            print(f"✓ Generated {len(code_files)} code files")
+            print(f"[OK] Generated {len(code_files)} code files")
         except Exception as e:
             state["error"] = f"Step 6 error: {str(e)}"
-            print(f"✗ Error in step 6: {e}")
+            print(f"[ERR] Error in step 6: {e}")
 
         return state
 
     def _step7_review_code(self, state: WorkflowState) -> WorkflowState:
         """Step 7: Review generated code."""
-        print("🔎 Step 7: Reviewing code...")
+        print("[CHECK] Step 7: Reviewing code...")
 
         try:
             review_results = self.code_reviewer.execute(
@@ -245,16 +245,16 @@ class MultiAgentPipeline:
             )
             state["review_results"] = review_results
             print(
-                f"✓ Code review completed (Score: {review_results.get('overall_score', 'N/A')})")
+                f"[OK] Code review completed (Score: {review_results.get('overall_score', 'N/A')})")
         except Exception as e:
             state["error"] = f"Step 7 error: {str(e)}"
-            print(f"✗ Error in step 7: {e}")
+            print(f"[ERR] Error in step 7: {e}")
 
         return state
 
     def _step8_test_code(self, state: WorkflowState) -> WorkflowState:
         """Step 8: Generate and run tests."""
-        print("🧪 Step 8: Testing code...")
+        print("[TEST] Step 8: Testing code...")
 
         try:
             test_results = self.code_tester.execute(
@@ -267,16 +267,16 @@ class MultiAgentPipeline:
             test_files = test_results.get("test_files", {})
             state["code_files"].update(test_files)
 
-            print(f"✓ Tests generated and executed")
+            print(f"[OK] Tests generated and executed")
         except Exception as e:
             state["error"] = f"Step 8 error: {str(e)}"
-            print(f"✗ Error in step 8: {e}")
+            print(f"[ERR] Error in step 8: {e}")
 
         return state
 
     def _step9_write_documentation(self, state: WorkflowState) -> WorkflowState:
         """Step 9: Generate documentation."""
-        print("📖 Step 9: Writing documentation...")
+        print("[READ] Step 9: Writing documentation...")
 
         try:
             documentation_files = self.documentation_writer.execute(
@@ -286,16 +286,16 @@ class MultiAgentPipeline:
             )
             state["documentation_files"] = documentation_files
             print(
-                f"✓ Generated {len(documentation_files)} documentation files")
+                f"[OK] Generated {len(documentation_files)} documentation files")
         except Exception as e:
             state["error"] = f"Step 9 error: {str(e)}"
-            print(f"✗ Error in step 9: {e}")
+            print(f"[ERR] Error in step 9: {e}")
 
         return state
 
     def _step10_write_to_disk(self, state: WorkflowState) -> WorkflowState:
         """Step 10: Write all files to disk."""
-        print("💾 Step 10: Writing files to disk...")
+        print("[SAVE] Step 10: Writing files to disk...")
 
         try:
             project_name = state["requirements"].get(
@@ -310,10 +310,10 @@ class MultiAgentPipeline:
             self.fs_writer.write_files(project_path, all_files)
 
             state["project_path"] = str(project_path)
-            print(f"✓ Project written to: {project_path}")
+            print(f"[OK] Project written to: {project_path}")
         except Exception as e:
             state["error"] = f"Step 10 error: {str(e)}"
-            print(f"✗ Error in step 10: {e}")
+            print(f"[ERR] Error in step 10: {e}")
 
         return state
 
@@ -332,7 +332,7 @@ class MultiAgentPipeline:
             Final state with all results
         """
         print("=" * 70)
-        print("🚀 Multi-Agent Software Factory - Starting Pipeline")
+        print("[START] Multi-Agent Software Factory - Starting Pipeline")
         print("=" * 70)
 
         # Initialize state
@@ -357,9 +357,9 @@ class MultiAgentPipeline:
         print("=" * 70)
         if final_state.get("error"):
             print(
-                f"⚠️  Pipeline completed with errors: {final_state['error']}")
+                f"[WARN]  Pipeline completed with errors: {final_state['error']}")
         else:
-            print("✅ Pipeline completed successfully!")
+            print("[OK] Pipeline completed successfully!")
         print("=" * 70)
 
         return final_state

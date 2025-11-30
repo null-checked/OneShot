@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
     """
     Modern replacement for @app.on_event("startup").
     """
-    logger.info("🚀 Starting up application...")
+    logger.info("[START] Starting up application...")
     
     # Initialize DB connections or ML models here
     yield   

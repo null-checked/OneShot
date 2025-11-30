@@ -48,7 +48,7 @@ async def build_project(uri: str, prompt: str):
                     
                 elif msg_type == "complete":
                     data = response.get("data")
-                    print("\n✅ Project generation complete!")
+                    print("\n[OK] Project generation complete!")
                     print(f"Project: {data.get('project_name')}")
                     print(f"Files: {data.get('files_count')}")
                     print(f"Path: {data.get('project_path')}")

@@ -192,40 +192,129 @@
                 log('✓ Connected to server', 'connected');
                 setConnected(true);
             };
+                // Map to keep per-step UI nodes so substeps can be expanded
+                const stepContainers = {};
 
-            ws.onmessage = (event) => {
-                const response = JSON.parse(event.data);
+                // Create or update a step container (collapsible)
+                function ensureStepContainer(step, mainMessage) {
+                    if (stepContainers[step]) {
+                        // update header
+                        const header = stepContainers[step].querySelector('.step-header');
+                        header.textContent = `[Step ${step}/10] ${mainMessage}`;
+                        return stepContainers[step];
+                    }
 
-                if (response.type === 'connected') {
-                    log('Server: ' + response.message, 'connected');
-                    // Send build request
-                    ws.send(JSON.stringify({
-                        action: 'build',
-                        data: { prompt: prompt }
-                    }));
-                    log('→ Sent build request', 'info');
+                    const container = document.createElement('div');
+                    container.style.border = '1px solid #eee';
+                    container.style.padding = '8px';
+                    container.style.margin = '6px 0';
+                    container.style.borderRadius = '6px';
+
+                    const headerRow = document.createElement('div');
+                    headerRow.style.display = 'flex';
+                    headerRow.style.justifyContent = 'space-between';
+                    headerRow.style.alignItems = 'center';
+
+                    const header = document.createElement('div');
+                    header.className = 'step-header';
+                    header.textContent = `[Step ${step}/10] ${mainMessage}`;
+                    header.style.fontWeight = '700';
+
+                    const toggle = document.createElement('button');
+                    toggle.textContent = 'Show details';
+                    toggle.style.fontSize = '12px';
+                    toggle.style.padding = '6px 8px';
+                    toggle.style.borderRadius = '6px';
+                    toggle.onclick = () => {
+                        const details = container.querySelector('.step-details');
+                        if (details.style.display === 'none') {
+                            details.style.display = 'block';
+                            toggle.textContent = 'Hide details';
+                        } else {
+                            details.style.display = 'none';
+                            toggle.textContent = 'Show details';
+                        }
+                    };
+
+                    headerRow.appendChild(header);
+                    headerRow.appendChild(toggle);
+
+                    const details = document.createElement('div');
+                    details.className = 'step-details';
+                    details.style.display = 'none';
+                    details.style.marginTop = '8px';
+                    details.style.padding = '8px';
+                    details.style.background = '#fafafa';
+                    details.style.borderRadius = '6px';
+                    details.style.fontFamily = 'monospace';
+                    details.style.fontSize = '13px';
+
+                    container.appendChild(headerRow);
+                    container.appendChild(details);
+
+                    output.appendChild(container);
+                    output.scrollTop = output.scrollHeight;
+
+                    stepContainers[step] = container;
+                    return container;
                 }
-                else if (response.type === 'progress') {
-                    log(`[Step ${response.step}/10] ${response.message}`, 'progress');
-                }
-                else if (response.type === 'complete') {
-                    const data = response.data;
-                    log('✅ Project generation complete!', 'complete');
-                    log(`Project: ${data.project_name}`, 'complete');
-                    log(`Files: ${data.files_count}`, 'complete');
-                    log(`Path: ${data.project_path}`, 'complete');
-                    log(`Download: ${data.download_url}`, 'complete');
-                    if (data.review_score) {
-                        log(`Review Score: ${data.review_score}`, 'complete');
+
+                // Small heartbeat indicator
+                const heartbeatEl = document.createElement('div');
+                heartbeatEl.style.fontSize = '12px';
+                heartbeatEl.style.color = '#666';
+                heartbeatEl.style.marginTop = '6px';
+                output.appendChild(heartbeatEl);
+
+                ws.onmessage = (event) => {
+                    const response = JSON.parse(event.data);
+
+                    if (response.type === 'connected') {
+                        log('Server: ' + response.message, 'connected');
+                        // Send build request
+                        ws.send(JSON.stringify({
+                            action: 'build',
+                            data: { prompt: prompt }
+                        }));
+                        log('→ Sent build request', 'info');
                     }
-                    if (data.tests_passed) {
-                        log(`Tests Passed: ${data.tests_passed}`, 'complete');
+                    else if (response.type === 'heartbeat') {
+                        heartbeatEl.textContent = `Heartbeat — step: ${response.current_step} — last: ${response.last_substep}`;
                     }
-                }
-                else if (response.type === 'error') {
-                    log('❌ Error: ' + response.error, 'error');
-                }
-            };
+                    else if (response.type === 'progress') {
+                        const step = response.step;
+                        const msg = response.message;
+                        ensureStepContainer(step, msg);
+                    }
+                    else if (response.type === 'substep') {
+                        const step = response.step;
+                        const sub = response.substep;
+                        const msg = response.message;
+                        const container = ensureStepContainer(step, `Progressing`);
+                        const details = container.querySelector('.step-details');
+                        const line = document.createElement('div');
+                        line.textContent = `• [${sub}] ${msg}`;
+                        details.appendChild(line);
+                        output.scrollTop = output.scrollHeight;
+                    }
+                    else if (response.type === 'complete') {
+                        const data = response.data;
+                        log('✅ Project generation complete!', 'complete');
+                        log(`Project: ${data.project_name}`, 'complete');
+                        log(`Files: ${data.files_count}`, 'complete');
+                        log(`Path: ${data.project_path}`, 'complete');
+                        log(`Download: ${data.download_url}`, 'complete');
+                        if (data.review_score) {
+                            log(`Review Score: ${data.review_score}`, 'complete');
+                        }
+                        if (data.tests_passed) {
+                            log(`Tests Passed: ${data.tests_passed}`, 'complete');
+                        }
+                    }
+                    else if (response.type === 'error') {
+                        log('❌ Error: ' + response.error, 'error');
+                    }
+                };
 
             ws.onerror = (error) => {
                 log('WebSocket error occurred', 'error');

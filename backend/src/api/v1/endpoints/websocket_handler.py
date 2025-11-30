@@ -45,6 +45,16 @@ class WebSocketManager:
             "data": data
         })
 
+    async def send_substep(self, client_id: str, step: int, substep: str, message: str, data: Any = None):
+        """Send detailed substep update to client (what agents are doing)."""
+        await self.send_message(client_id, {
+            "type": "substep",
+            "step": step,
+            "substep": substep,
+            "message": message,
+            "data": data
+        })
+
     async def send_error(self, client_id: str, error: str):
         """Send error message to client."""
         await self.send_message(client_id, {
@@ -134,28 +144,83 @@ async def run_pipeline_with_progress(pipeline: MultiAgentPipeline, prompt: str, 
     
     # Get the main event loop before starting the executor
     main_loop = asyncio.get_running_loop()
-    
-    # Create a sync callback that works from any thread
-    def progress_callback(step_num: int, message: str):
+
+    # Shared status to support heartbeat and UI 'expandable' view
+    status = {
+        "current_step": 0,
+        "last_substep": "",
+        "running": True
+    }
+
+    # Heartbeat loop: sends light-weight updates so UI can show activity
+    async def heartbeat_loop():
+        try:
+            while status["running"]:
+                await asyncio.sleep(3)
+                try:
+                    await manager.send_message(client_id, {
+                        "type": "heartbeat",
+                        "current_step": status["current_step"],
+                        "last_substep": status["last_substep"]
+                    })
+                except Exception:
+                    # swallow; heartbeat should never crash pipeline
+                    pass
+        except asyncio.CancelledError:
+            return
+
+    heartbeat_task = asyncio.create_task(heartbeat_loop())
+
+    # Create a sync callback that works from any thread and updates status
+    def progress_callback(step_num: int, message: str, data: Any = None):
         """Callback that sends progress updates to the WebSocket client."""
+        status["current_step"] = step_num
         try:
             # Schedule the coroutine to run in the main event loop
             asyncio.run_coroutine_threadsafe(
-                manager.send_progress(client_id, step_num, message),
+                manager.send_progress(client_id, step_num, message, data),
                 main_loop
             )
         except Exception as e:
             print(f"Error sending progress update: {e}")
-    
-    # Create a new pipeline instance with the progress callback
+
+    def substep_callback(step_num: int, substep: str, message: str, data: Any = None):
+        """Callback that sends substep (detailed) updates to the WebSocket client."""
+        status["current_step"] = step_num
+        # Record a compact last_substep string for heartbeat
+        try:
+            last = message if isinstance(message, str) else str(message)
+            status["last_substep"] = f"{substep}: {last[:120]}"
+        except Exception:
+            status["last_substep"] = f"{substep}"
+
+        try:
+            asyncio.run_coroutine_threadsafe(
+                manager.send_substep(client_id, step_num, substep, message, data),
+                main_loop
+            )
+        except Exception as e:
+            print(f"Error sending substep update: {e}")
+
+    # Create a new pipeline instance with the progress and substep callbacks
     pipeline_with_progress = MultiAgentPipeline(
         openai_api_key=settings.OPENAI_API_KEY,
-        progress_callback=progress_callback
+        progress_callback=progress_callback,
+        substep_callback=substep_callback
     )
-    
+
     # Run pipeline in executor to avoid blocking
-    final_state = await main_loop.run_in_executor(None, pipeline_with_progress.run, prompt)
-    
+    try:
+        final_state = await main_loop.run_in_executor(None, pipeline_with_progress.run, prompt)
+    finally:
+        # Stop heartbeat and wait briefly
+        status["running"] = False
+        try:
+            heartbeat_task.cancel()
+            await asyncio.wait_for(heartbeat_task, timeout=1)
+        except Exception:
+            pass
+
     return final_state
 
 

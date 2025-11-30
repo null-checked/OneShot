@@ -45,6 +45,15 @@ async def build_project(uri: str, prompt: str):
                     step = response.get("step")
                     message = response.get("message")
                     print(f"[Step {step}] {message}")
+                elif msg_type == "heartbeat":
+                    cur = response.get("current_step")
+                    last = response.get("last_substep")
+                    print(f"[heartbeat] step={cur} last={last}")
+                elif msg_type == "substep":
+                    step = response.get("step")
+                    substep = response.get("substep")
+                    message = response.get("message")
+                    print(f"  → [Step {step} - {substep}] {message}")
                     
                 elif msg_type == "complete":
                     data = response.get("data")

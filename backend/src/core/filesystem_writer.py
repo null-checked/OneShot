@@ -70,10 +70,10 @@ class FilesystemWriter:
             with open(full_path, 'w', encoding='utf-8') as f:
                 f.write(content)
 
-            print(f"✓ Written: {file_path}")
+            print(f"[OK] Written: {file_path}")
             return True
         except Exception as e:
-            print(f"✗ Error writing {file_path}: {str(e)}")
+            print(f"[ERR] Error writing {file_path}: {str(e)}")
             return False
 
     def write_files(self, project_path: Path, files: Dict[str, str]) -> Dict[str, bool]:
@@ -110,10 +110,10 @@ class FilesystemWriter:
                 'zip',
                 project_path
             )
-            print(f"✓ Created zip: {zip_path}")
+            print(f"[OK] Created zip: {zip_path}")
             return zip_path
         except Exception as e:
-            print(f"✗ Error creating zip: {str(e)}")
+            print(f"[ERR] Error creating zip: {str(e)}")
             return None
 
     def get_project_summary(self, project_path: Path) -> Dict:

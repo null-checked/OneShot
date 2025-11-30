@@ -47,20 +47,26 @@ export function TestRunner({
         return;
       }
 
+      // Capture the current test index for the closure
+      const testIndex = currentTest;
+
       // Set to running
       setAnimatedStates(prev => {
         const next = [...prev];
-        next[currentTest] = 'running';
+        next[testIndex] = 'running';
         return next;
       });
 
       // After a delay, set to passed/failed
       setTimeout(() => {
-        setAnimatedStates(prev => {
-          const next = [...prev];
-          next[currentTest] = results[currentTest].passed ? 'passed' : 'failed';
-          return next;
-        });
+        const result = results[testIndex];
+        if (result) {
+          setAnimatedStates(prev => {
+            const next = [...prev];
+            next[testIndex] = result.passed ? 'passed' : 'failed';
+            return next;
+          });
+        }
       }, 200);
 
       currentTest++;

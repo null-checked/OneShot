@@ -14,7 +14,7 @@ test.db
 log.txt
 Pipfile.lock
 env3.*
-env
+.env
 docs_build
 site_build
 venv
@@ -31,3 +31,4 @@ archive.zip
 
 # Ignore while the setup still depends on requirements.txt files
 uv.lock
+generated_projects

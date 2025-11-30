@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Brain, Code, TestTube, Trophy } from 'lucide-react';
+import { Brain, Code, TestTube, Trophy, RefreshCw, AlertCircle, CheckCircle2, Wrench } from 'lucide-react';
 import type { AgentState } from '@/lib/types';
 import { PixelGrid } from './PixelGrid';
 import { TestRunner } from './TestRunner';
@@ -13,15 +13,17 @@ interface AgentCardProps {
 }
 
 export function AgentCard({ agent }: AgentCardProps) {
-  const { personality, status, solution, testResults, score } = agent;
+  const { personality, status, task, solution, testResults, testFeedback, score, retryCount, maxRetries } = agent;
 
   // Status badge configuration
   const statusConfig = {
     idle: { label: 'Idle', icon: null, color: 'bg-zinc-600' },
     thinking: { label: 'Thinking', icon: Brain, color: 'bg-blue-500 animate-pulse' },
+    coding: { label: 'Coding', icon: Code, color: 'bg-purple-500 animate-pulse' },
     testing: { label: 'Testing', icon: TestTube, color: 'bg-yellow-500 animate-pulse' },
+    fixing: { label: 'Fixing', icon: Wrench, color: 'bg-orange-500 animate-pulse' },
     complete: { label: 'Complete', icon: Trophy, color: 'bg-green-500' },
-    error: { label: 'Error', icon: null, color: 'bg-red-500' },
+    error: { label: 'Error', icon: AlertCircle, color: 'bg-red-500' },
   };
 
   const currentStatus = statusConfig[status];
@@ -43,15 +45,45 @@ export function AgentCard({ agent }: AgentCardProps) {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-bold">{personality.name}</CardTitle>
-          <Badge className={currentStatus.color}>
-            {StatusIcon && <StatusIcon className="w-3 h-3 mr-1" />}
-            {currentStatus.label}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {/* Retry counter */}
+            {retryCount > 0 && (
+              <Badge variant="outline" className="text-xs">
+                <RefreshCw className="w-3 h-3 mr-1" />
+                {retryCount}/{maxRetries}
+              </Badge>
+            )}
+            <Badge className={currentStatus.color}>
+              {StatusIcon && <StatusIcon className="w-3 h-3 mr-1" />}
+              {currentStatus.label}
+            </Badge>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">{personality.approach}</p>
       </CardHeader>
 
       <CardContent className="space-y-3">
+        {/* Assigned Task */}
+        {task && (
+          <div className="p-2 rounded bg-zinc-100 dark:bg-zinc-900 border-l-2" style={{ borderColor: personality.color }}>
+            <p className="text-xs font-medium mb-1">Assigned Task:</p>
+            <p className="text-xs text-muted-foreground">{task.description}</p>
+            {task.requirements && task.requirements.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs font-medium">Requirements:</p>
+                <ul className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                  {task.requirements.slice(0, 3).map((req, i) => (
+                    <li key={i} className="flex items-start gap-1">
+                      <span style={{ color: personality.color }}>•</span>
+                      <span>{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Approach and Complexity */}
         {solution && (
           <div className="space-y-1">
@@ -70,10 +102,49 @@ export function AgentCard({ agent }: AgentCardProps) {
         {solution?.code && (
           <PixelGrid
             code={solution.code}
-            animate={status === 'thinking'}
-            maxRows={15}
+            animate={status === 'coding'}
+            maxRows={12}
             pixelSize={2}
           />
+        )}
+
+        {/* Test Feedback from Test Agent */}
+        {testFeedback && (
+          <div className={`p-2 rounded border ${testFeedback.passed ? 'bg-green-50 dark:bg-green-950/20 border-green-500' : 'bg-red-50 dark:bg-red-950/20 border-red-500'}`}>
+            <div className="flex items-center gap-1 mb-1">
+              {testFeedback.passed ? (
+                <CheckCircle2 className="w-3 h-3 text-green-500" />
+              ) : (
+                <AlertCircle className="w-3 h-3 text-red-500" />
+              )}
+              <p className="text-xs font-medium">
+                Test Agent: {testFeedback.test_agent}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">{testFeedback.feedback}</p>
+            
+            {!testFeedback.passed && testFeedback.failed_tests && testFeedback.failed_tests.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs font-medium text-red-600 dark:text-red-400">Failed Tests:</p>
+                <ul className="text-xs text-muted-foreground mt-1">
+                  {testFeedback.failed_tests.slice(0, 2).map((test, i) => (
+                    <li key={i} className="text-red-600 dark:text-red-400">• {test}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {!testFeedback.passed && testFeedback.suggestions && testFeedback.suggestions.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs font-medium">Suggestions:</p>
+                <ul className="text-xs text-muted-foreground mt-1">
+                  {testFeedback.suggestions.slice(0, 2).map((suggestion, i) => (
+                    <li key={i}>💡 {suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Test Results */}
@@ -127,20 +198,29 @@ export function AgentCard({ agent }: AgentCardProps) {
           </div>
         )}
 
-        {/* Thinking display */}
-        {status === 'thinking' && !solution && (
+        {/* Coding animation */}
+        {(status === 'coding' || status === 'fixing') && !solution && (
           <div className="flex items-center justify-center h-32 bg-zinc-100 dark:bg-zinc-900 rounded">
             <div className="text-center space-y-2">
-              <Brain className="w-8 h-8 mx-auto text-muted-foreground animate-pulse" />
-              <p className="text-xs text-muted-foreground">Generating solution...</p>
+              {status === 'fixing' ? (
+                <>
+                  <Wrench className="w-8 h-8 mx-auto text-orange-500 animate-pulse" />
+                  <p className="text-xs text-muted-foreground">Fixing issues (Retry {retryCount}/{maxRetries})...</p>
+                </>
+              ) : (
+                <>
+                  <Code className="w-8 h-8 mx-auto text-muted-foreground animate-pulse" />
+                  <p className="text-xs text-muted-foreground">Implementing solution...</p>
+                </>
+              )}
             </div>
           </div>
         )}
 
         {/* Idle state */}
-        {status === 'idle' && (
+        {status === 'idle' && !task && (
           <div className="flex items-center justify-center h-32 bg-zinc-100 dark:bg-zinc-900 rounded">
-            <p className="text-xs text-muted-foreground">Waiting to start...</p>
+            <p className="text-xs text-muted-foreground">Waiting for task assignment...</p>
           </div>
         )}
       </CardContent>

@@ -4,12 +4,13 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from contextlib import asynccontextmanager
 
 from src.api.v1.router import routers
+from src.api.v1.endpoints.websocket_handler import websocket_endpoint
 from src.settings import settings
 
 app = FastAPI()
@@ -22,12 +23,17 @@ async def root():
         "name": "Multi-Agent Software Factory",
         "version": "1.0.0",
         "description": "AI-powered software project generator",
+        "protocol": "WebSocket (ws://) for real-time updates",
         "endpoints": {
-            "/build": "POST - Generate a software project from a prompt",
+            "/ws": "WebSocket - Main endpoint for project generation with real-time progress",
             "/download/{project_name}": "GET - Download generated project as zip",
-            "/projects": "GET - List all generated projects",
-            "/project/{project_name}/details": "GET - Get detailed project information",
+            "/projects/list": "GET - List all generated projects (REST fallback)",
             "/health": "GET - Health check"
+        },
+        "websocket_actions": {
+            "build": "Generate a software project from a prompt with real-time updates",
+            "list": "List all generated projects",
+            "details": "Get detailed project information"
         },
         "workflow_steps": [
             "1. Analyze user prompt",
@@ -38,7 +44,8 @@ async def root():
             "6. Implement code",
             "7. Review code",
             "8. Test code",
-            "9. Write documentation"
+            "9. Write documentation",
+            "10. Write to disk"
         ]
     }
 
@@ -47,7 +54,7 @@ async def lifespan(app: FastAPI):
     """
     Modern replacement for @app.on_event("startup").
     """
-    logger.info("🚀 Starting up application...")
+    logger.info("[START] Starting up application...")
     
     # Initialize DB connections or ML models here
     yield   
@@ -72,6 +79,11 @@ def create_app() -> FastAPI:  # pragma: no cover
     )
     logger.info("Including routers...")
     app.include_router(routers)
+    
+    # Add WebSocket endpoint
+    logger.info("Adding WebSocket endpoint...")
+    app.add_api_websocket_route("/ws", websocket_endpoint)
+    
     return app
 
 

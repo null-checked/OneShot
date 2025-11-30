@@ -284,6 +284,17 @@ class ArchitectPipeline:
                 content_lower = content.lower()
                 for pattern in placeholder_patterns:
                     if pattern.lower() in content_lower:
+                        # Find the line with the pattern and show context
+                        for i, line in enumerate(lines, 1):
+                            if pattern.lower() in line.lower():
+                                context_start = max(0, i - 2)
+                                context_end = min(len(lines), i + 2)
+                                code_context = '\n'.join(lines[context_start:context_end])
+                                return {
+                                    "valid": False,
+                                    "error": f"File '{file_path}' contains FORBIDDEN placeholder pattern '{pattern}' at line {i}. You MUST write COMPLETE, WORKING code instead of placeholders.\n\nProblematic code:\n{code_context}\n\nFIX THIS: Replace the placeholder with actual working implementation!"
+                                }
+                        # If pattern found but not in specific line (shouldn't happen)
                         return {
                             "valid": False,
                             "error": f"File contains placeholder code ('{pattern}'): {file_path}"

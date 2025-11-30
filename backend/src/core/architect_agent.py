@@ -53,9 +53,28 @@ and create a detailed implementation plan that defines:
 - Be specific in instructions - agents will follow them literally
 - Consider the tech stack and structure carefully
 
+**CRITICAL - API Contract & Code Structure Rules**:
+- ALWAYS specify EXPLICIT API contracts in agent instructions
+- For each agent, define EXACT function signatures or class methods they must implement
+- Specify whether to use CLASSES or STANDALONE FUNCTIONS (be consistent!)
+- If one agent needs to import from another, specify the EXACT import statement
+- Example good instruction: "Create a DataHandler class with methods: load_data(filepath: str) -> dict, save_data(filepath: str, data: dict) -> None"
+- Example bad instruction: "Implement data handling functions" (too vague!)
+- For shared modules (data handlers, utilities), ALWAYS use classes for better encapsulation
+- For the main/CLI file, specify which classes to import and how to use them
+
+**CRITICAL - Agent Ordering Rules**:
+- Order agents so dependencies come BEFORE dependents
+- Data layer agents (models, handlers) should come FIRST
+- Business logic agents should come SECOND
+- CLI/UI agents should come THIRD
+- Test writers MUST come LAST (so they can see all code)
+- Example order: data_handler → expense_manager → budget_manager → cli → test_writer
+
 **CRITICAL - Test Definition Rules**:
 - For unit/integration tests, use INLINE tests or create a DEDICATED test agent
 - If defining pytest/unittest tests, you MUST create an agent to generate test files
+- Test writer agent MUST be the LAST agent in the list
 - Syntax checks don't need test files: "python -m py_compile file.py"
 - Functional tests can run the main file directly: "python main.py --test"
 - DON'T define tests for files that won't be created
@@ -69,10 +88,22 @@ Output **ONLY** valid JSON in this exact format:
     "entry_point": "main.py",
     "agents": [
         {
-            "name": "agent_name",
-            "role": "What this agent does",
-            "instructions": "Detailed step-by-step instructions for implementation",
-            "files_to_generate": ["path/to/file1.py", "path/to/file2.py"]
+            "name": "worker_1",
+            "role": "Short description of responsibility",
+            "instructions": "Detailed instructions with explicit API contract. Example: Create a SomeClass with method some_method(self, arg1: type) -> return_type that does X. Use proper error handling.",
+            "files_to_generate": ["file1.py"]
+        },
+        {
+            "name": "worker_2",
+            "role": "Short description of responsibility",
+            "instructions": "Clear instructions with dependencies. Example: IMPORT: from file1 import SomeClass. Create another class that uses SomeClass. Initialize it properly with required arguments.",
+            "files_to_generate": ["file2.py"]
+        },
+        {
+            "name": "test_writer",
+            "role": "Generate comprehensive tests",
+            "instructions": "Create unit tests for ALL existing modules. ONLY test classes and methods that actually exist in the generated code. Use the exact import statements and class/method names from the actual implementation.",
+            "files_to_generate": ["tests/test_file1.py", "tests/test_file2.py"]
         }
     ],
     "tests": [

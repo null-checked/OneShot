@@ -53,6 +53,14 @@ and create a detailed implementation plan that defines:
 - Be specific in instructions - agents will follow them literally
 - Consider the tech stack and structure carefully
 
+**CRITICAL - Test Definition Rules**:
+- For unit/integration tests, use INLINE tests or create a DEDICATED test agent
+- If defining pytest/unittest tests, you MUST create an agent to generate test files
+- Syntax checks don't need test files: "python -m py_compile file.py"
+- Functional tests can run the main file directly: "python main.py --test"
+- DON'T define tests for files that won't be created
+- Example: If you define "pytest tests/test_X.py", create an agent with role "test_writer" that generates "tests/test_X.py"
+
 Output **ONLY** valid JSON in this exact format:
 {
     "project_name": "my_project",

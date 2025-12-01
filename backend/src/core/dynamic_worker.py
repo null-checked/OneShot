@@ -7,6 +7,8 @@ from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 import json
+from deepagents import create_deep_agent
+from src.core.tools.search_tool import internet_search
 
 
 class DynamicWorkerAgent:
@@ -47,19 +49,35 @@ class DynamicWorkerAgent:
         if context is None:
             context = {}
 
-        system_prompt = self._create_system_prompt()
-        user_prompt = self._create_user_prompt(context)
+        # Ensure context is JSON serializable before passing to _create_user_prompt
+        serializable_context = self._ensure_json_serializable(context)
 
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
-        ]
+        system_prompt = self._create_system_prompt()
+        user_prompt = self._create_user_prompt(serializable_context) # Use serializable_context here
+
 
         try:
-            response = self.llm.invoke(messages)
+            deep_agent_instance = create_deep_agent(
+                self.llm,
+                tools=[internet_search], # Assuming dynamic worker might use internet search
+                system_prompt=system_prompt,
+                name=self.name,
+                debug=False
+            )
+
+            response = deep_agent_instance.invoke(
+                {
+                    "messages" : [
+                        {
+                            "role": "user",
+                            "content": user_prompt
+                        }
+                    ]
+                }
+            )
 
             # Parse the response as JSON
-            files = self._parse_files_response(response.content)
+            files = self._parse_files_response(response) # Assuming deep_agent.invoke returns a string directly
 
             # Validate that all required files are present
             files = self._ensure_all_files(files)
@@ -67,9 +85,31 @@ class DynamicWorkerAgent:
             return files
 
         except Exception as e:
-            print(f"Error in worker agent '{self.name}': {e}")
+            error_msg = str(e)
+            print(f"Error in worker agent '{self.name}': {error_msg}")
+            # Print first 500 chars of error for debugging
+            if len(error_msg) > 500:
+                print(f"Error details (first 500 chars): {error_msg[:500]}")
             # Return fallback files
             return self._create_fallback_files()
+
+    def _ensure_json_serializable(self, obj: Any) -> Any:
+        """
+        Recursively converts non-JSON-serializable objects (like LangChain message objects)
+        to their string representation.
+        """
+        if isinstance(obj, dict):
+            return {k: self._ensure_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._ensure_json_serializable(elem) for elem in obj]
+        elif hasattr(obj, 'content') and isinstance(obj.content, str): # Handle LangChain message objects
+            return obj.content
+        else:
+            try:
+                json.dumps(obj)
+                return obj
+            except TypeError:
+                return str(obj) # Fallback to string representation for other non-serializable types
 
     def _create_system_prompt(self) -> str:
         """Create the system prompt for this worker agent."""
@@ -163,7 +203,7 @@ def process_data(data):
     '''Process input data and return cleaned results.'''
     if not data:
         return []
-    return [item.strip().lower() for item in data if item]
+    return [item.strip().lower() for item in data if item and isinstance(item, str)]
 ```
 
 Notice: Every function has REAL, WORKING code that actually does something!
@@ -367,7 +407,8 @@ Notice: Every function has REAL, WORKING code that actually does something!
             func_match = re.match(r'def\s+(\w+)\s*\(([^)]*)\)', stripped)
             if func_match:
                 func_name = func_match.group(1)
-                func_params = func_match.group(2).strip()
+                func_params_raw = func_match.group(2)
+                func_params = func_params_raw.strip() if isinstance(func_params_raw, str) else str(func_params_raw).strip()
 
                 # Skip private/magic methods EXCEPT __init__ (we need that for instantiation)
                 if func_name.startswith('_') and func_name != '__init__':
@@ -389,27 +430,98 @@ Notice: Every function has REAL, WORKING code that actually does something!
 
         return structure
 
-    def _parse_files_response(self, content: str) -> Dict[str, str]:
+    def _parse_files_response(self, content: Any) -> Dict[str, str]:
         """Parse the LLM response to extract file contents."""
-        content = content.strip()
-
+        # Handle deepagents response structure with 'messages' key
+        if isinstance(content, dict):
+            # Check if this is a deepagents response with 'messages' key
+            if 'messages' in content and isinstance(content['messages'], list):
+                messages_list = content['messages']
+                # Get the LAST message (which is the assistant's response with the actual content)
+                if messages_list:
+                    last_message = messages_list[-1]
+                    if isinstance(last_message, dict) and 'content' in last_message:
+                        content = last_message['content']
+                    elif hasattr(last_message, 'content') and not isinstance(last_message, dict):
+                        content = last_message.content
+                    else:
+                        content = str(last_message)
+                else:
+                    raise ValueError("Messages list is empty")
+            else:
+                # Try to parse as JSON file mapping directly
+                return content
+        
+        # Handle message objects with .content attribute (from deepagents/LangChain)
+        if hasattr(content, 'content') and not isinstance(content, str):
+            content = content.content
+        
+        # Handle list responses (shouldn't happen now, but keep as fallback)
+        if isinstance(content, list):
+            # Try to extract string content from list items
+            string_parts = []
+            for item in content:
+                if item is None:
+                    continue
+                elif isinstance(item, str):
+                    string_parts.append(item)
+                elif hasattr(item, 'content'):
+                    if item.content is not None:
+                        content_str = str(item.content) if not isinstance(item.content, str) else item.content
+                        if isinstance(content_str, str) and content_str.strip():
+                            string_parts.append(content_str)
+                else:
+                    item_str = str(item)
+                    if isinstance(item_str, str) and item_str.strip():
+                        string_parts.append(item_str)
+            if not string_parts:
+                raise ValueError("No valid string content found in list response")
+            content = '\n'.join(string_parts)
+        
+        # Ensure content is a string at this point
+        if not isinstance(content, str):
+            content = str(content)
+        
         # Remove markdown code blocks if present
-        if content.startswith("```json"):
+        if not isinstance(content, str):
+            raise ValueError(f"Content must be a string, got {type(content)}")
+        content = content.strip()
+        
+        if isinstance(content, str) and content.startswith("```json"):
             content = content[7:]
-        elif content.startswith("```"):
+        elif isinstance(content, str) and content.startswith("```"):
             content = content[3:]
 
-        if content.endswith("```"):
+        if isinstance(content, str) and content.endswith("```"):
             content = content[:-3]
 
-        content = content.strip()
-
-        files = json.loads(content)
-
-        # Ensure it's a dictionary
+        if not isinstance(content, str):
+            raise ValueError(f"Content must be a string before JSON parsing, got {type(content)}")
+        
+        content_stripped = content.strip()
+        if not isinstance(content_stripped, str):
+            raise ValueError(f"Stripped content is not a string: {type(content_stripped)}")
+        
+        # Try to find and extract JSON object from content
+        # Sometimes the response has text before/after the JSON
+        json_content = content_stripped
+        
+        # If content starts with non-JSON text, try to find the JSON part
+        if json_content and not json_content.lstrip().startswith('{'):
+            # Look for the first { and last }
+            first_brace = json_content.find('{')
+            last_brace = json_content.rfind('}')
+            if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                json_content = json_content[first_brace:last_brace+1]
+        
+        try:
+            files = json.loads(json_content)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON response: {str(e)[:200]}. Content (first 300 chars): {json_content[:300]}")
+        
         if not isinstance(files, dict):
-            raise ValueError("Response is not a dictionary")
-
+            raise ValueError(f"Expected JSON object, got {type(files).__name__}")
+        
         return files
 
     def _ensure_all_files(self, files: Dict[str, str]) -> Dict[str, str]:

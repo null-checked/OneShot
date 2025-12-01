@@ -10,7 +10,8 @@ import asyncio
 from typing import Dict, Any
 
 from src.core.pipeline import MultiAgentPipeline
-from src.settings import get_pipeline_agent, fs_writer
+from src.settings import fs_writer
+from src.utils.pipeline_agent import get_pipeline_agent
 from src.api.v1.helpers import create_project_zip
 
 

@@ -4,11 +4,12 @@ Part of the Multi-Agent Software Factory Generator
 """
 
 from typing import Dict, Any, List, Optional
+from deepagents import create_deep_agent
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.system import SystemMessage
-from deepagents import create_deep_agent
+
 import json
 
 from src.core.tools.search_tool import internet_search
@@ -34,7 +35,8 @@ class PromptAnalyzerAgent:
     - Target platform (web, mobile, desktop, CLI)
     - Any specific requirements or constraints
     
-    Output valid JSON with these fields:
+    Output ONLY valid JSON with these fields:
+    ```json
     {
         "project_name": "...",
         "description": "...",
@@ -43,6 +45,7 @@ class PromptAnalyzerAgent:
         "platform": "...",
         "constraints": ["...", "..."]
     }
+    ```
     """
 
     def __init__(self, llm: ChatOpenAI):
@@ -51,6 +54,7 @@ class PromptAnalyzerAgent:
 
     def execute(self, user_prompt: str) -> Dict[str, Any]:
         """Analyze the user prompt and extract requirements."""
+        print("Executing PromptAnalyzerAgent...")
         deep_agent = create_deep_agent(self.llm, tools=[internet_search], system_prompt=self.SYSTEM_PROMPT, name=self.name, debug=False)
         print(f"Analyzing prompt with {self.name}. User prompt: {user_prompt}")
         response = deep_agent.invoke(
@@ -63,7 +67,7 @@ class PromptAnalyzerAgent:
                 ]
             }
         )
-
+        
         try:
             result = json.loads(response) if isinstance(response, str) else response
         except json.JSONDecodeError:
@@ -78,7 +82,6 @@ class PromptAnalyzerAgent:
             }
 
         return result
-
 
 # ============================================================================
 # AGENT 2: Research Planner Agent
@@ -370,21 +373,6 @@ class DocumentationResearcherAgent:
             result = {"documentation": {}}
 
         return result
-
-
-    def _ensure_json_serializable(self, obj: Any) -> Any:
-        if isinstance(obj, dict):
-            return {k: self._ensure_json_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self._ensure_json_serializable(elem) for elem in obj]
-        elif hasattr(obj, 'content'): # Handle LangChain message objects
-            return obj.content
-        else:
-            try:
-                json.dumps(obj)
-                return obj
-            except TypeError:
-                return str(obj) # Fallback to string representation for other non-serializable types
 
 
 # ============================================================================

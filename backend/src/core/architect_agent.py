@@ -7,6 +7,8 @@ from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 import json
+from deepagents import create_deep_agent
+from src.core.tools.search_tool import internet_search
 
 
 class ArchitectAgent:
@@ -126,6 +128,7 @@ Output **ONLY** valid JSON in this exact format:
 
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
+        self.name = "ArchitectAgent"
 
     def execute(self, user_prompt: str) -> Dict[str, Any]:
         """
@@ -137,16 +140,27 @@ Output **ONLY** valid JSON in this exact format:
         Returns:
             Dictionary with project plan including agents, tests, and success criteria
         """
-        messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
-            HumanMessage(content=f"User Request:\n{user_prompt}\n\nCreate a detailed implementation plan.")
-        ]
-
         try:
-            response = self.llm.invoke(messages)
+            deep_agent_instance = create_deep_agent(
+                self.llm,
+                tools=[internet_search],
+                system_prompt=self.SYSTEM_PROMPT,
+                name=self.name,
+                debug=False
+            )
 
+            response = deep_agent_instance.invoke(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": user_prompt
+                        }
+                    ]
+                }
+            )
             # Try to parse JSON from response
-            plan = self._parse_json_response(response.content)
+            plan = self._parse_json_response(response) # Changed from plan = response
 
             # Validate the plan structure
             plan = self._validate_and_fix_plan(plan, user_prompt)
@@ -160,8 +174,6 @@ Output **ONLY** valid JSON in this exact format:
 
     def _parse_json_response(self, content: str) -> Dict[str, Any]:
         """Extract and parse JSON from LLM response."""
-        # Sometimes LLM wraps JSON in markdown code blocks
-        content = content.strip()
 
         # Remove markdown code blocks if present
         if content.startswith("```json"):
@@ -171,8 +183,6 @@ Output **ONLY** valid JSON in this exact format:
 
         if content.endswith("```"):
             content = content[:-3]
-
-        content = content.strip()
 
         return json.loads(content)
 

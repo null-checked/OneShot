@@ -101,7 +101,17 @@ class ProjectBuilder:
             HumanMessage(content=user_prompt)
         ]
 
-        response = self.llm.invoke(messages)
+        response = deep_agent.invoke(
+            {
+                "messages" : [
+                    { 
+                        "role": "user",
+                        "content": user_prompt_content
+                    }
+                ]
+            }
+        )
+
         logger.info(response)
         print(response)
         try:
@@ -175,7 +185,7 @@ if __name__ == "__main__":
 # Copy this to .env and fill in your values
 
 API_KEY=your_api_key_here
-DEBUG=true
+debug=False
 '''
 
         return {

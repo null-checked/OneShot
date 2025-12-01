@@ -7,8 +7,11 @@ from typing import Dict, Any
 from langchain_openai import ChatOpenAI
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.system import SystemMessage
+from deepagents import create_deep_agent
 import json
 from datetime import datetime
+
+from src.core.tools.search_tool import internet_search
 
 
 class DocumentationWriter:
@@ -19,6 +22,7 @@ class DocumentationWriter:
 
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
+        self.name = "DocumentationWriter"
 
     def generate_documentation(self,
                                requirements: Dict[str, Any],
@@ -54,6 +58,20 @@ class DocumentationWriter:
 
         return docs
 
+    def _ensure_json_serializable(self, obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {k: self._ensure_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._ensure_json_serializable(elem) for elem in obj]
+        elif hasattr(obj, 'content'): # Handle LangChain message objects
+            return obj.content
+        else:
+            try:
+                json.dumps(obj)
+                return obj
+            except TypeError:
+                return str(obj) # Fallback to string representation for other non-serializable types
+
     def _generate_readme(self, requirements: Dict[str, Any],
                          implementation_plan: Dict[str, Any]) -> str:
         """Generate README.md using LLM."""
@@ -73,37 +91,39 @@ class DocumentationWriter:
         Make it professional and clear.
         """
 
+        # Ensure inputs are JSON-serializable
+        serializable_requirements = self._ensure_json_serializable(requirements)
+        serializable_implementation_plan = self._ensure_json_serializable(implementation_plan)
+
         user_prompt = f"""Generate README.md for:
 
-Project: {requirements.get('project_name', 'Project')}
-Description: {requirements.get('description', '')}
-Features: {json.dumps(requirements.get('features', []), indent=2)}
-Tech Stack: {json.dumps(implementation_plan.get('tech_stack_final', []), indent=2)}
-Platform: {requirements.get('platform', 'general')}
+Project: {serializable_requirements.get('project_name', 'Project')}
+Description: {serializable_requirements.get('description', '')}
+Features: {json.dumps(serializable_requirements.get('features', []), indent=2)}
+Tech Stack: {json.dumps(serializable_implementation_plan.get('tech_stack_final', []), indent=2)}
+Platform: {serializable_requirements.get('platform', 'general')}
 """
 
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
-        ]
-
+        deep_agent = create_deep_agent(self.llm, tools=[internet_search], system_prompt="", name=self.name,debug=False) # System prompt passed in messages
+        print("Generating README.md with DocumentationWriter agent.")
         response = deep_agent.invoke(
             {
                 "messages" : [
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    },
                     { 
                         "role": "user",
-                        "content": user_prompt_content
+                        "content": user_prompt
                     }
                 ]
             }
         )
-
-
-        # If LLM doesn't return good markdown, use fallback
-        if len(response.content) < 100:
+        content = response
+        if len(content) < 100:
             return self._generate_fallback_readme(requirements)
-
-        return response.content
+        return content
 
     def _generate_fallback_readme(self, requirements: Dict[str, Any]) -> str:
         """Generate basic README if LLM fails."""

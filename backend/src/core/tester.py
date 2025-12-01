@@ -78,7 +78,17 @@ Features to test: {', '.join(requirements.get('features', []))}
             HumanMessage(content=user_prompt)
         ]
 
-        response = self.llm.invoke(messages)
+        response = deep_agent.invoke(
+            {
+                "messages" : [
+                    { 
+                        "role": "user",
+                        "content": user_prompt_content
+                    }
+                ]
+            }
+        )
+
 
         try:
             test_files = json.loads(response.content)

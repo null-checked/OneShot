@@ -8,6 +8,8 @@ from langchain_openai import ChatOpenAI
 from pathlib import Path
 import json
 
+from pydantic import SecretStr
+
 from src.core.architect_agent import ArchitectAgent
 from src.core.dynamic_worker import DynamicWorkerAgent
 from src.core.testing_agent import TestingAgent
@@ -33,8 +35,8 @@ class ArchitectPipeline:
             max_retries: Maximum retries per agent (default: 5)
         """
         self.llm = ChatOpenAI(
-            model="gpt-5-mini",
-            openai_api_key=openai_api_key
+            model="gpt-5",
+            api_key=SecretStr(openai_api_key),
         )
 
         self.architect = ArchitectAgent(self.llm)
@@ -248,6 +250,11 @@ class ArchitectPipeline:
 
         # Check that files are not empty or placeholder-only
         for file_path, content in files.items():
+            if not isinstance(content, str):
+                return {
+                    "valid": False,
+                    "error": f"File content must be string, got {type(content).__name__}: {file_path}"
+                }
             if not content or len(content.strip()) < 10:
                 return {
                     "valid": False,
@@ -257,7 +264,7 @@ class ArchitectPipeline:
             # Check for excessive TODO/placeholder comments
             if file_path.endswith('.py'):
                 lines = content.split('\n')
-                code_lines = [l for l in lines if l.strip() and not l.strip().startswith('#')]
+                code_lines = [l for l in lines if isinstance(l, str) and l.strip() and not l.strip().startswith('#')]
 
                 if len(code_lines) < 3:
                     return {

@@ -1,7 +1,5 @@
 from pydantic_settings import BaseSettings
 
-from src.core.pipeline import MultiAgentPipeline
-from src.core.architect_pipeline import ArchitectPipeline
 from src.core.filesystem_writer import FilesystemWriter
 
 class Settings(BaseSettings):
@@ -17,6 +15,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
 
     OPENAI_API_KEY: str
+    
+    TAVILY_API_KEY: str
 
     # Pipeline configuration
     USE_ARCHITECT_PIPELINE: bool = True  # Set to True to use new architect-based pipeline
@@ -27,18 +27,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-def get_pipeline_agent():
-    """
-    Get the pipeline agent based on configuration.
-    Returns ArchitectPipeline if USE_ARCHITECT_PIPELINE is True, otherwise MultiAgentPipeline.
-    """
-    if settings.USE_ARCHITECT_PIPELINE:
-        return ArchitectPipeline(
-            openai_api_key=settings.OPENAI_API_KEY,
-            max_retries=settings.MAX_AGENT_RETRIES
-        )
-    else:
-        return MultiAgentPipeline(settings.OPENAI_API_KEY)
 
 fs_writer = FilesystemWriter()
